@@ -22,3 +22,17 @@ struct PriorityQueue
     struct LinkedList *tail;
     int type;
 };
+/*
+*Messages structs:
+*Note: A message should not contain pointers as it will cause segmentaiton fault. 
+*/
+struct ProcessBuff
+{
+    long header;
+    struct Process content;
+};
+struct RemainingTimeBuff
+{
+    long header;
+    int content;
+};
