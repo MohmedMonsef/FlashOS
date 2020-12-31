@@ -43,8 +43,6 @@ int createQueue(int key)
 */
 int receiveProcess(struct ProcessBuff * message)
 {
-    
-    printf("Receiving a process, ");
     return msgrcv(gen_q_id, message, sizeof(message->content), ALL, IPC_NOWAIT);
 }
 
