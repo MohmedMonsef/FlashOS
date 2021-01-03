@@ -1,5 +1,5 @@
 #include "headers.h"
-#include "structs.h"
+#include "./Structs/structs.h"
 
 int createQueue(int key);
 int sendRemainingTime(struct RemainingTimeBuff * message, int q_id);
@@ -64,5 +64,5 @@ void clearResources(int signum)
 {
     kill(getppid(), SIGUSR2);
     destroyClk(false);
-    exit(signum);
+    exit(0);
 }

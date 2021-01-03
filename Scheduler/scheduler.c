@@ -1,5 +1,5 @@
 #include "headers.h"
-#include "structs.h"
+#include "./Structs/structs.h"
 
 int createQueue(int key);
 int receiveProcess(struct ProcessBuff * message);
@@ -16,7 +16,7 @@ int main(int argc, char * argv[])
     //TODO implement the scheduler :)
     //upon termination release the clock resources.
     
-    clearResources(0);
+    //clearResources(0); I commented this cause it terminates the program as schedular not built yet
 }
 
 
@@ -63,5 +63,5 @@ void clearResources(int signum)
 {
     msgctl(sched_q_id, IPC_RMID, (struct msqid_ds *)0);
     destroyClk(true);
-    exit(signum);
+    exit(0);
 }

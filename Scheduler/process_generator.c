@@ -12,17 +12,126 @@ int main(int argc, char * argv[])
 {
     signal(SIGINT, clearResources);
     // TODO Initialization
-    // 1. Read the input files.
-    // 2. Ask the user for the chosen scheduling algorithm and its parameters, if there are any.
-    // 3. Initiate and create the scheduler and clock processes.
-    // 4. Use this function after creating the clock process to initialize clock
-    initClk();
-    // To get time use this
-    int x = getClk();
-    printf("current time is %d\n", x);
-    // TODO Generation Main Loop
+    // 1. Read the input files.(done)
+    int n = 0;
+    FILE *fs = fopen(argv[1],"r");
+    if(!fs)
+    {
+    	printf("No such File with this Name");
+    	return 0 ;
+    }
+    else
+    {
+    	char L[1000];
+    	while(!feof(fs))
+    	{
+    		fscanf(fs,"%s",L);
+    		if(L[0] == '#')
+    		{
+    			fscanf(fs,"%[^\n]",L);
+    		} 
+    		else
+    		{
+    			//sscanf(L,"%d",&Array[i]);
+				n++;
+    		}
+    	}
+    }
+    int i = 0;
+    int Array[n];
+    fs = fopen(argv[1],"r");
+    if(!fs)
+    {
+    	printf("No such File with this Name");
+    	return 0 ;
+    }
+    else
+    {
+    	char L[1000];
+    	while(!feof(fs))
+    	{
+    		fscanf(fs,"%s",L);
+    		if(L[0] == '#')
+    		{
+    			fscanf(fs,"%[^\n]",L);
+    		} 
+    		else
+    		{
+    			sscanf(L,"%d",&Array[i]);
+				i++;
+    		}
+    	}
+    }
     // 5. Create a data structure for processes and provide it with its parameters.
-    // 6. Send the information to the scheduler at the appropriate time.
+    n = (i-1)/4;
+    struct Process Processes[n];
+    int index = 0;
+    for(int j = 0 ; j < i-1 ; j+= 4)
+    {
+    	struct Process P;
+    	P.id = Array[j];
+    	P.arrival = Array[j+1];
+    	P.runtime = Array[j+2];
+    	P.priority = Array[j+3];
+    	Processes[index] = P;
+    	index++;
+    } 
+    // 2. Ask the user for the chosen scheduling algorithm and its parameters, if there are any.(done)
+    int pid1,pid2 ;
+    char* Parameter,*Algo;
+    printf("What is the Scheduling Algorthim you want to work with\n");
+    printf("Enter:\n");
+    printf("1 for Non-Peremative Priority\n");
+    printf("2 for Short job first\n");
+    printf("3 for Round Robin\n");            
+	scanf("%s",Algo);
+	if(atoi(Algo) == 3)
+	{
+		printf("Enter time slot for each process");
+		scanf("%s",Parameter);
+	}
+    // 3. Initiate and create the scheduler and clock processes.
+    pid1 = fork();
+	if(pid1 == -1)
+		perror("error in fork");
+	else if(pid1 == 0)
+	{
+				// schedular
+		char*a[] = { Algo ,Parameter , NULL };
+		execv("./scheduler.out",a);
+	}
+	else
+	{
+		pid2 = fork();
+		if(pid2 == -1)
+			perror("error in fork");
+		else if(pid2 == 0)
+		{
+			//clock
+			char*a[] = { NULL };
+			execv("./clk.out",a);
+		}
+		else
+		{
+			//generator		
+			int index = 0 ;
+			// 4. Use this function after creating the clock process to initialize clock
+			initClk();
+			// TODO Generation Main Loop
+			int x ;
+			while(index < n)
+			{
+				// To get time use this
+				x = getClk();
+				while(x >= Processes[index].arrival&&index < n)
+    			{
+    			// 6. Send the information to the scheduler at the appropriate time.
+    				printf("%d %d\n",x,Processes[index].arrival);//instead send
+    				index++;	
+    			}	
+			}
+		}	
+		}
     // 7. Clear clock resources
     clearResources(0);
 }
@@ -49,7 +158,7 @@ int sendProcess(struct ProcessBuff * message, int q_id)
 */ 
 void clearResources(int signum)
 {
-    msgctl(gen_q_id, IPC_RMID, (struct msqid_ds *)0);
+    //msgctl(gen_q_id, IPC_RMID, (struct msqid_ds *)0);
     destroyClk(true);
-    exit(signum);
+    exit(0);
 }
