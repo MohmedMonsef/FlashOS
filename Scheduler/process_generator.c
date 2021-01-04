@@ -10,6 +10,7 @@ int gen_q_id;
 
 int main(int argc, char * argv[])
 {
+	gen_q_id = createQueue(GENERATOR_Q_KEY);
     signal(SIGINT, clearResources);
     // TODO Initialization
     // 1. Read the input files.(done)
@@ -133,15 +134,24 @@ int main(int argc, char * argv[])
 		}	
 		}
     // 7. Clear clock resources
-    clearResources(0);
+	// Sleep untill being interrupted or the Scheduler exits.
+    raise(SIGSTOP);
 }
 
-/*
- * Return q_id on success and -1 on failure.
+/* 
+ * Return q_id on success and exit on failure.
 */
 int createQueue(int key)
 {
-    return msgget(key, 0666 | IPC_CREAT);
+    printf("Schedular subscribing to the generator Q\n");
+    int q_id = msgget(key, 0666 | IPC_CREAT);
+    if(q_id == -1)
+    {
+        printf("failed to connect to the generator Q:(\n");
+        exit(-1);
+    }
+    else
+        return q_id;
 }
 
 /* 
@@ -150,7 +160,12 @@ int createQueue(int key)
 */
 int sendProcess(struct ProcessBuff * message, int q_id)
 {
-    return msgsnd(q_id, message, sizeof(message->content), !IPC_NOWAIT);
+    int status = msgsnd(q_id, message, sizeof(message->content), !IPC_NOWAIT);
+	if(status == -1)
+	{
+		printf("Failed to send the process @ Generator:(\n");
+	}
+	return status;
 }
 
 /*
@@ -158,7 +173,7 @@ int sendProcess(struct ProcessBuff * message, int q_id)
 */ 
 void clearResources(int signum)
 {
-    //msgctl(gen_q_id, IPC_RMID, (struct msqid_ds *)0);
+    msgctl(gen_q_id, IPC_RMID, (struct msqid_ds *)0);
     destroyClk(true);
     exit(0);
 }

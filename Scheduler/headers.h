@@ -16,8 +16,9 @@ typedef short bool;
 #define false 0
 
 #define SHKEY 300
-#define PROCESS_Q_KEY 301
-#define SCHEDULAR_Q_KEY 302
+#define GENERATOR_Q_KEY 114
+#define SCHEDULER_SHM_KEY 404
+#define SEM_KEY 405
 #define ALL 0
 
 
