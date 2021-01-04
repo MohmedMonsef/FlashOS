@@ -177,6 +177,7 @@ int getRemainingTime()
 */
 void clearResources(int signum)
 {
+    kill(getppid(), SIGCONT);
     semctl(sem_id, 0, IPC_RMID, (struct semid_ds *)0);
     shmctl(shm_id, IPC_RMID, (struct shmid_ds *)0);
     destroyClk(true);

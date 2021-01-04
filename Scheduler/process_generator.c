@@ -10,8 +10,9 @@ int gen_q_id;
 
 int main(int argc, char * argv[])
 {
+	signal(SIGINT, clearResources);
 	gen_q_id = createQueue(GENERATOR_Q_KEY);
-    signal(SIGINT, clearResources);
+    struct ProcessBuff message;
     // TODO Initialization
     // 1. Read the input files.(done)
     int n = 0;
