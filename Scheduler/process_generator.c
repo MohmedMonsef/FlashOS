@@ -136,7 +136,9 @@ int main(int argc, char * argv[])
 		}
     // 7. Clear clock resources
 	// Sleep untill being interrupted or the Scheduler exits.
-    raise(SIGSTOP);
+	int status;
+    waitpid(pid1, &status, 0);
+	clearResources(0);
 }
 
 /* 
