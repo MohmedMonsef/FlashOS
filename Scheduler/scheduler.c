@@ -1,22 +1,41 @@
 #include "headers.h"
 #include "./Structs/structs.h"
+#include "./DataStructures/PriorityQueue.h"
 
 int createQueue(int key);
 int receiveProcess(struct ProcessBuff * message);
 void handleChildExit(int signum);
 void clearResources(int signum);
+void HPF();
 
 int gen_q_id, sched_q_id;
-
+int schedulerType;
+bool processRunning=false;
 int main(int argc, char * argv[])
 {
+    key_t key_id;
     initClk();
     signal(SIGINT, clearResources);
     signal(SIGUSR2, handleChildExit);
     //TODO implement the scheduler :)
+    schedulerType = atoi(argv[1]);
+
+    if(schedulerType != 3){
+        createPriorityQueue(2-schedulerType);
+    }
     //upon termination release the clock resources.
-    
+    key_id = ftok("keyFile", SCHEDULAR_Q_KEY);
+    int key = msgget(key_id, 0666 | IPC_CREAT);
+    createQueue(key);
+    struct ProcessBuff* receivedProcess;
+    while(1){
+        if(schedulerType == 1)
+        {
+            HPF(receivedProcess);
+        }
+    }
     //clearResources(0); I commented this cause it terminates the program as schedular not built yet
+
 }
 
 
@@ -52,6 +71,7 @@ int receiveProcess(struct ProcessBuff * message)
 void handleChildExit(int signum)
 {
     printf("Parent is notified of child exit.\n");
+    processRunning=false;
 }
 
 /*
@@ -64,4 +84,25 @@ void clearResources(int signum)
     msgctl(sched_q_id, IPC_RMID, (struct msqid_ds *)0);
     destroyClk(true);
     exit(0);
+}
+
+void HPF(struct ProcessBuff* receivedProcess){
+    receivedProcess=NULL;
+    receiveProcess(receivedProcess);
+    if(receivedProcess){
+        pushProcess(receivedProcess->content);
+    }
+    if(!processRunning){
+        struct Process *curProccess = popProcess();
+        if(curProccess){
+            int pid = fork();
+            if(pid == -1)
+                perror("error in fork");
+            else if(pid == 0)
+            {
+                char*arg[] = { curProccess->runtime , NULL };
+                execv("./process.out",arg);
+            }
+        }
+    }
 }

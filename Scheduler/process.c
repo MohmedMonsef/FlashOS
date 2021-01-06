@@ -17,9 +17,17 @@ int main(int agrc, char * argv[])
     signal(SIGINT, clearResources);
     //TODO it needs to get the remaining time from somewhere
     //remainingtime = ??;
+    remaining_time=atoi(argv[1]);
+    int prevClk = getClk();
     while (remaining_time > 0)
     {
         // remainingtime = ??;
+        int nxtClk = getClk();
+        if(nxtClk != prevClk){
+            remaining_time--;
+            prevClk = nxtClk;
+        }
+
     }
     
     

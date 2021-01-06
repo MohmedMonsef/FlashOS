@@ -96,7 +96,7 @@ int main(int argc, char * argv[])
 		perror("error in fork");
 	else if(pid1 == 0)
 	{
-				// schedular
+		// schedular
 		char*a[] = { Algo ,Parameter , NULL };
 		execv("./scheduler.out",a);
 	}
@@ -127,6 +127,7 @@ int main(int argc, char * argv[])
     			{
     			// 6. Send the information to the scheduler at the appropriate time.
     				printf("%d %d\n",x,Processes[index].arrival);//instead send
+					
     				index++;	
     			}	
 			}
