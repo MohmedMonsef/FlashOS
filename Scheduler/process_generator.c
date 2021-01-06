@@ -1,5 +1,4 @@
 #include "headers.h"
-#include "./Structs/structs.h"
 
 void clearResources(int signum);
 int createQueue(int key);
@@ -10,7 +9,9 @@ int gen_q_id;
 
 int main(int argc, char * argv[])
 {
-    signal(SIGINT, clearResources);
+	signal(SIGINT, clearResources);
+	gen_q_id = createQueue(GENERATOR_Q_KEY);
+    struct ProcessBuff message;
     // TODO Initialization
     // 1. Read the input files.(done)
     int n = 0;
@@ -85,6 +86,7 @@ int main(int argc, char * argv[])
     printf("2 for Short job first\n");
     printf("3 for Round Robin\n");            
 	scanf("%s",Algo);
+	printf("%s in generator\n",Algo);
 	if(atoi(Algo) == 3)
 	{
 		printf("Enter time slot for each process");
@@ -123,26 +125,41 @@ int main(int argc, char * argv[])
 			{
 				// To get time use this
 				x = getClk();
+				
 				while(x >= Processes[index].arrival&&index < n)
     			{
-    			// 6. Send the information to the scheduler at the appropriate time.
+    				// 6. Send the information to the scheduler at the appropriate time.
     				printf("%d %d\n",x,Processes[index].arrival);//instead send
-					
+					struct ProcessBuff * newProcess;
+					newProcess->header = 1;
+					newProcess->content = Processes[index];
+					sendProcess(newProcess ,gen_q_id);
     				index++;	
     			}	
 			}
 		}	
 		}
     // 7. Clear clock resources
-    clearResources(0);
+	// Sleep untill being interrupted or the Scheduler exits.
+	int status;
+    waitpid(pid1, &status, 0);
+	clearResources(0);
 }
 
-/*
- * Return q_id on success and -1 on failure.
+/* 
+ * Return q_id on success and exit on failure.
 */
 int createQueue(int key)
 {
-    return msgget(key, 0666 | IPC_CREAT);
+    int q_id = msgget(key, 0666 | IPC_CREAT);
+	printf("generator subscribing to the generator Q,qid = %d\n",q_id);
+    if(q_id == -1)
+    {
+        printf("failed to connect to the generator Q:(\n");
+        exit(-1);
+    }
+    else
+        return q_id;
 }
 
 /* 
@@ -151,7 +168,12 @@ int createQueue(int key)
 */
 int sendProcess(struct ProcessBuff * message, int q_id)
 {
-    return msgsnd(q_id, message, sizeof(message->content), !IPC_NOWAIT);
+    int status = msgsnd(q_id, message, sizeof(message->content), !IPC_NOWAIT);
+	if(status == -1)
+	{
+		printf("Failed to send the process @ Generator:(\n");
+	}
+	return status;
 }
 
 /*
@@ -159,7 +181,7 @@ int sendProcess(struct ProcessBuff * message, int q_id)
 */ 
 void clearResources(int signum)
 {
-    //msgctl(gen_q_id, IPC_RMID, (struct msqid_ds *)0);
+    msgctl(gen_q_id, IPC_RMID, (struct msqid_ds *)0);
     destroyClk(true);
     exit(0);
 }
