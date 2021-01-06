@@ -1,5 +1,5 @@
 #include "headers.h"
-#include "./Structs/structs.h"
+
 
 
 /* arg for semctl system calls. */
@@ -23,11 +23,16 @@ int getRemainingTime();
 
 void handleChildExit(int signum);
 void clearResources(int signum);
+void HPF();
 
-int gen_q_id, shm_id, sem_id, *sched_shmaddr;
-
+int gen_q_id, shm_id, sem_id;
+int *sched_shmaddr;
+int schedulerType;
+bool processRunning=false;
 int main(int argc, char * argv[])
 {
+    printf("in Shedueler\n");
+    key_t key_id;
     initClk();
     signal(SIGINT, clearResources);
     signal(SIGUSR2, handleChildExit);
@@ -37,15 +42,21 @@ int main(int argc, char * argv[])
     union Semun semun;
     sem_id = createSem(SEM_KEY, &semun);
     //TODO implement the scheduler :)
+    schedulerType = atoi(argv[0]);
+    printf("schedulerType %d , %s ,argc %d\n",schedulerType,argv[0],argc);
+    if(schedulerType != 3){
+        createPriorityQueue(2-schedulerType);
+    }
     //upon termination release the clock resources.
-    while(1) //To Be MODIFIED.
-    {
-        if(receiveProcess(&message) != -1)
+    struct ProcessBuff* receivedProcess;
+    while(1){
+        if(schedulerType == 1)
         {
-            printf("message Received: id = %i, arrival = %i\n", message.content.id, message.content.arrival);
+            HPF(receivedProcess);
         }
     }
     //clearResources(0); I commented this cause it terminates the program as schedular not built yet
+
 }
 
 
@@ -62,8 +73,8 @@ int main(int argc, char * argv[])
 */
 int createQueue(int key)
 {
-    printf("Schedular subscribing to the generator Q\n");
     int q_id = msgget(key, 0666 | IPC_CREAT);
+    printf("Schedular subscribing to the generator Q,qid = %d\n",q_id);
     if(q_id == -1)
     {
         printf("failed to connect to the generator Q:(\n");
@@ -80,8 +91,10 @@ int createQueue(int key)
 */
 int receiveProcess(struct ProcessBuff * message)
 {
-    //printf("Scheduler is Receiving a process\n");
-    return msgrcv(gen_q_id, message, sizeof(message->content), ALL, IPC_NOWAIT);
+    // printf("Scheduler is Receiving a process\n");
+    int x= msgrcv(gen_q_id, message, sizeof(message->content), ALL, IPC_NOWAIT);
+    printf("received message, %d\n",message->content.id);
+    return x;
 }
 
 /*
@@ -90,6 +103,7 @@ int receiveProcess(struct ProcessBuff * message)
 void handleChildExit(int signum)
 {
     printf("Parent is notified of child exit.\n");
+    processRunning=false;
 }
 
 int createShmem(int key)
@@ -106,13 +120,13 @@ int createShmem(int key)
 
     
     sched_shmaddr = (int *)shmat(shmid, (void *)0, 0);
-    if (sched_shmaddr == -1)
+    if (*sched_shmaddr == -1)
     {
         perror("Error in attach in Scheduler:(\n");
         exit(-1);
     }
     else
-        printf("Scheduler: Shared memory attached at address %x\n", sched_shmaddr);
+        printf("Scheduler: Shared memory attached at address %ls\n", sched_shmaddr);
     return shm_id;
 }
 
@@ -175,6 +189,15 @@ int getRemainingTime()
     return *sched_shmaddr;
 }
 
+void writer(int newMem)
+{
+    *sched_shmaddr = newMem;
+}
+
+int reader()
+{
+    return *sched_shmaddr;
+}
 
 /*
  * Remove "Schedular Q"
@@ -188,4 +211,30 @@ void clearResources(int signum)
     shmctl(shm_id, IPC_RMID, (struct shmid_ds *)0);
     destroyClk(true);
     exit(0);
+}
+
+void HPF(struct ProcessBuff* receivedProcess){
+    // receivedProcess=NULL;
+    int rsv_value=receiveProcess(receivedProcess);
+    // printf("rsv_value %d\n",rsv_value);
+    if(rsv_value !=1){
+        printf("new process %d\n",receivedProcess->content.id);
+        pushProcess(receivedProcess->content);
+    }
+    if(!processRunning){
+        struct Process *curProccess = popProcess();
+        if(curProccess){
+            int pid = fork();
+            if(pid == -1)
+                perror("error in fork");
+            else if(pid == 0)
+            {
+
+                char runtime[50]; 
+                sprintf(runtime, "%d", curProccess->runtime); 
+                char*arg[] = { runtime, NULL };
+                execv("./process.out",arg);
+            }
+        }
+    }
 }

@@ -1,5 +1,4 @@
 #include "headers.h"
-#include "./Structs/structs.h"
 
 /* arg for semctl system calls. */
 union Semun
@@ -20,7 +19,8 @@ void sendRemainingTime();
 void stopHandler(int signum);
 void clearResources(int signum);
 
-int remaining_time, shm_id, *sched_shmaddr, sem_id;
+int remaining_time, shm_id, sem_id;
+int *sched_shmaddr;
 
 int main(int agrc, char * argv[])
 {
@@ -31,10 +31,16 @@ int main(int agrc, char * argv[])
     union Semun semun;
     createSem(SEM_KEY, &semun);
     //TODO it needs to get the remaining time from somewhere
-    //remainingtime = ??;
+    remaining_time=atoi(argv[0]);
+    int prevClk = getClk();
     while (remaining_time > 0)
     {
-        // remainingtime = ??;
+        int nxtClk = getClk();
+        if(nxtClk != prevClk){
+            remaining_time--;
+            prevClk = nxtClk;
+        }
+
     }
     
     
@@ -42,7 +48,7 @@ int main(int agrc, char * argv[])
 }
 
 
-int attachShmem(int key)
+int attachShm(int key)
 {
     int shmid = shmget(key, 4, IPC_CREAT | 0644);
 
@@ -56,13 +62,13 @@ int attachShmem(int key)
 
     
     sched_shmaddr = (int *)shmat(shmid, (void *)0, 0);
-    if (sched_shmaddr == -1)
+    if (*sched_shmaddr == -1)
     {
         perror("Error in attach in Process:(\n");
         exit(-1);
     }
     else
-        printf("Process: Shared memory attached at address %x\n", sched_shmaddr);
+        printf("Process: Shared memory attached at address %ls\n", sched_shmaddr);
     return shm_id;
 }
 

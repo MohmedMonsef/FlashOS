@@ -10,8 +10,11 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
+#include "./Structs/structs.h"
+#include "./DataStructures/PriorityQueue.h"
+#include <string.h>
 
-typedef short bool;
+typedef short BOOLEAN;
 #define true 1
 #define false 0
 

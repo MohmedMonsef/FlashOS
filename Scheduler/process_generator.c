@@ -1,5 +1,4 @@
 #include "headers.h"
-#include "./Structs/structs.h"
 
 void clearResources(int signum);
 int createQueue(int key);
@@ -106,7 +105,7 @@ int main(int argc, char * argv[])
 		perror("error in fork");
 	else if(pid1 == 0)
 	{
-				// schedular
+		// schedular
 		char*a[] = { Algo ,Parameter , NULL };
 		execv("./scheduler.out",a);
 	}
@@ -157,6 +156,7 @@ int createQueue(int key)
 {
     printf("Create the generator Q\n");
     int q_id = msgget(key, 0666 | IPC_CREAT);
+	printf("generator subscribing to the generator Q,qid = %d\n",q_id);
     if(q_id == -1)
     {
         printf("failed to Create the generator Q:(\n");

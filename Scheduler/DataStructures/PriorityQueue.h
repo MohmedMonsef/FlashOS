@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include "../Structs/structs.h"
 
 // The Main Priority Queue
 struct PriorityQueue *PriorityQueue = NULL;
