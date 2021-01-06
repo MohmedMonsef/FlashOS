@@ -24,21 +24,27 @@ int getRemainingTime();
 void handleChildExit(int signum);
 void clearResources(int signum);
 
-int gen_q_id, shm_id, sem_id;
-int *shmaddr;
+int gen_q_id, shm_id, sem_id, *sched_shmaddr;
 
 int main(int argc, char * argv[])
 {
     initClk();
     signal(SIGINT, clearResources);
     signal(SIGUSR2, handleChildExit);
+    struct ProcessBuff message;
     gen_q_id = createQueue(GENERATOR_Q_KEY);
     shm_id = createShmem(SCHEDULER_SHM_KEY);
     union Semun semun;
     sem_id = createSem(SEM_KEY, &semun);
     //TODO implement the scheduler :)
     //upon termination release the clock resources.
-    
+    while(1) //To Be MODIFIED.
+    {
+        if(receiveProcess(&message) != -1)
+        {
+            printf("message Received: id = %i, arrival = %i\n", message.content.id, message.content.arrival);
+        }
+    }
     //clearResources(0); I commented this cause it terminates the program as schedular not built yet
 }
 
@@ -63,8 +69,8 @@ int createQueue(int key)
         printf("failed to connect to the generator Q:(\n");
         exit(-1);
     }
-    else
-        return q_id;
+    printf("Scheduler Subscribed to the generator Q, Q_id = %i\n", q_id);
+    return q_id;
 }
 
 /*
@@ -74,7 +80,7 @@ int createQueue(int key)
 */
 int receiveProcess(struct ProcessBuff * message)
 {
-    printf("Scheduler is Receiving a process\n");
+    //printf("Scheduler is Receiving a process\n");
     return msgrcv(gen_q_id, message, sizeof(message->content), ALL, IPC_NOWAIT);
 }
 
@@ -99,14 +105,14 @@ int createShmem(int key)
         printf("\nShared memory ID = %d\n", shmid);
 
     
-    shmaddr = (int *)shmat(shmid, (void *)0, 0);
-    if (shmaddr == -1)
+    sched_shmaddr = (int *)shmat(shmid, (void *)0, 0);
+    if (sched_shmaddr == -1)
     {
         perror("Error in attach in Scheduler:(\n");
         exit(-1);
     }
     else
-        printf("Scheduler: Shared memory attached at address %x\n", shmaddr);
+        printf("Scheduler: Shared memory attached at address %x\n", sched_shmaddr);
     return shm_id;
 }
 
@@ -165,8 +171,8 @@ int getRemainingTime()
 {
     printf("Getting rem time at Scheduler\n");
     down(sem_id);
-    printf("Remaining time = %i", *shmaddr);
-    return *shmaddr;
+    printf("Remaining time = %i", *sched_shmaddr);
+    return *sched_shmaddr;
 }
 
 
@@ -177,6 +183,7 @@ int getRemainingTime()
 */
 void clearResources(int signum)
 {
+    printf("Clear Resources @ Scheduler\n");
     semctl(sem_id, 0, IPC_RMID, (struct semid_ds *)0);
     shmctl(shm_id, IPC_RMID, (struct shmid_ds *)0);
     destroyClk(true);

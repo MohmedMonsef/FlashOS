@@ -41,5 +41,6 @@ int main(int argc, char * argv[])
     {
         sleep(1);
         (*shmaddr)++;
+        printf("time = %i\n", (*shmaddr));
     }
 }

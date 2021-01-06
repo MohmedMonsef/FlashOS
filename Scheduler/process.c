@@ -20,7 +20,7 @@ void sendRemainingTime();
 void stopHandler(int signum);
 void clearResources(int signum);
 
-int remaining_time, shm_id, shmaddr, sem_id;
+int remaining_time, shm_id, *sched_shmaddr, sem_id;
 
 int main(int agrc, char * argv[])
 {
@@ -55,14 +55,14 @@ int attachShmem(int key)
         printf("\nShared memory ID = %d\n", shmid);
 
     
-    shmaddr = (int *)shmat(shmid, (void *)0, 0);
-    if (shmaddr == -1)
+    sched_shmaddr = (int *)shmat(shmid, (void *)0, 0);
+    if (sched_shmaddr == -1)
     {
         perror("Error in attach in Process:(\n");
         exit(-1);
     }
     else
-        printf("Process: Shared memory attached at address %x\n", shmaddr);
+        printf("Process: Shared memory attached at address %x\n", sched_shmaddr);
     return shm_id;
 }
 
@@ -121,7 +121,7 @@ void sendRemainingTime()
 {
     printf("Sending remaining time to Schedular\n");
     up(sem_id);
-    *shmaddr = remaining_time;
+    *sched_shmaddr = remaining_time;
 }
 
 /*
@@ -144,7 +144,7 @@ void stopHandler(int signum)
 */
 void clearResources(int signum)
 {
-    shmdt(shmaddr);
+    shmdt(sched_shmaddr);
     kill(getppid(), SIGUSR2);
     destroyClk(false);
     exit(0);
