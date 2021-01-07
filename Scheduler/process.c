@@ -11,9 +11,9 @@ union Semun
 };
 
 int attachShm(int key);
-int createSem(int key, union Semun *sem);
-void up(int sem_id);
-void down(int sem_id); //Not needed in the process
+void createSem(int key, union Semun *sem);
+void up();
+void down(); //Not needed in the process
 void sendRemainingTime();
 
 void stopHandler(int signum);
@@ -28,8 +28,8 @@ int main(int agrc, char *argv[])
     signal(SIGUSR1, stopHandler);
     signal(SIGINT, clearResources);
     attachShm(SCHEDULER_SHM_KEY);
-    // union Semun semun;
-    //createSem(SEM_KEY, &semun);
+    union Semun semun;
+    createSem(SEM_KEY, &semun);
     //TODO it needs to get the remaining time from somewhere
     remaining_time = atoi(argv[0]);
     int prevClk = getClk();
@@ -69,10 +69,10 @@ int attachShm(int key)
     return shm_id;
 }
 
-int createSem(int key, union Semun *sem)
+void createSem(int key, union Semun *sem)
 {
     //1. Create Sems:
-    int sem_id = semget(key, 1, 0666 | IPC_CREAT);
+    sem_id = semget(key, 1, 0666 | IPC_CREAT);
 
     if (sem_id == -1)
     {
@@ -86,11 +86,9 @@ int createSem(int key, union Semun *sem)
         perror("Error in semctl: set value\n");
         exit(-1);
     }
-
-    return sem_id;
 }
 
-void down(int sem_id)
+void down()
 {
     struct sembuf p_op;
 
@@ -100,12 +98,12 @@ void down(int sem_id)
 
     if (semop(sem_id, &p_op, 1) == -1)
     {
-        perror("Error in down() at Schedular:(\n");
+        perror("Error in down() at Process:(\n");
         exit(-1);
     }
 }
 
-void up(int sem_id)
+void up()
 {
     struct sembuf v_op;
 
@@ -115,7 +113,7 @@ void up(int sem_id)
 
     if (semop(sem_id, &v_op, 1) == -1)
     {
-        perror("Error in up() at Scheduler:(\n");
+        perror("Error in up() at Process:(\n");
         exit(-1);
     }
 }
@@ -123,8 +121,8 @@ void up(int sem_id)
 void sendRemainingTime()
 {
     printf("Sending remaining time to Schedular\n");
-    up(sem_id);
     *sched_shmaddr = remaining_time;
+    up();
 }
 
 /*

@@ -13,21 +13,24 @@ union Semun
 int createQueue(int key);
 int receiveProcess(struct ProcessBuff *message);
 int createShmem(int key);
-int createSem(int key, union Semun *sem);
-void up(int sem_id); //Not needed in the scheduler
-void down(int sem_id);
+void createSem(int key, union Semun *sem);
+void up(); //Not needed in the scheduler
+void down();
 int getRemainingTime();
 void handleChildExit(int signum);
 void clearResources(int signum);
 void HPF();
+void STN();
 void logProcess(int id, char *status, int clk);
 void writeInFile(char **params, int size);
 void insertPCB(struct Process newProccess, int pid);
-
+int runProcess(struct Process *curProccess);
+void contextSwitching_STN();
 int gen_q_id, shm_id, sem_id, curProcessId;
 int *sched_shmaddr;
 int schedulerType, processCount;
 bool processRunning = false;
+struct sembuf p_op;
 struct PCB *pcb;
 FILE *fLog;
 struct ProcessBuff *receivedProcess;
@@ -41,7 +44,7 @@ int main(int argc, char *argv[])
     gen_q_id = createQueue(GENERATOR_Q_KEY);
     shm_id = createShmem(SCHEDULER_SHM_KEY);
     union Semun semun;
-    sem_id = createSem(SEM_KEY, &semun);
+    createSem(SEM_KEY, &semun);
     schedulerType = atoi(argv[0]);
     processCount = atoi(argv[1]);
     pcb = (struct PCB *)malloc(processCount * sizeof(struct PCB));
@@ -57,7 +60,11 @@ int main(int argc, char *argv[])
     {
         if (schedulerType == 1)
         {
-            HPF(receivedProcess);
+            HPF();
+        }
+        else if (schedulerType == 2)
+        {
+            STN();
         }
     }
     fclose(fLog);
@@ -112,6 +119,7 @@ void handleChildExit(int signum)
     pcb[curProcessId].remainingTime = 0;
     logProcess(curProcessId, "finished", getClk());
     processRunning = false;
+    //p_op.sem_flg = (IPC_NOWAIT);
     processCount--;
 }
 
@@ -138,10 +146,10 @@ int createShmem(int key)
     return shm_id;
 }
 
-int createSem(int key, union Semun *sem)
+void createSem(int key, union Semun *sem)
 {
     //1. Create Sems:
-    int sem_id = semget(key, 1, 0666 | IPC_CREAT);
+    sem_id = semget(key, 1, 0666 | IPC_CREAT);
 
     if (sem_id == -1)
     {
@@ -155,17 +163,14 @@ int createSem(int key, union Semun *sem)
         perror("Error in semctl: set value\n");
         exit(-1);
     }
-
-    return sem_id;
 }
 
-void down(int sem_id)
+void down()
 {
-    struct sembuf p_op;
 
     p_op.sem_num = 0;
     p_op.sem_op = -1;
-    p_op.sem_flg = !IPC_NOWAIT;
+    p_op.sem_flg = (!IPC_NOWAIT);
 
     if (semop(sem_id, &p_op, 1) == -1)
     {
@@ -174,7 +179,7 @@ void down(int sem_id)
     }
 }
 
-void up(int sem_id)
+void up()
 {
     struct sembuf v_op;
 
@@ -191,20 +196,16 @@ void up(int sem_id)
 
 int getRemainingTime()
 {
-    printf("Getting rem time at Scheduler\n");
-    down(sem_id);
-    printf("Remaining time = %i", *sched_shmaddr);
-    return *sched_shmaddr;
-}
-
-void writer(int newMem)
-{
-    *sched_shmaddr = newMem;
-}
-
-int reader()
-{
-    return *sched_shmaddr;
+    printf("B READ\n");
+    if (processRunning)
+    {
+        down();
+        int rem = *sched_shmaddr;
+        //up();
+        printf("Getting rem time at Scheduler\n");
+        return rem;
+    }
+    return -1;
 }
 
 /*
@@ -228,6 +229,7 @@ void insertPCB(struct Process newProccess, int pid)
     pcb[id].process = newProccess;
     pcb[id].pid = pid;
     pcb[id].remainingTime = newProccess.runtime;
+    pcb[curProcessId].lastStopped = newProccess.arrival;
 }
 //TODO
 //delete - should free the created process memory
@@ -288,24 +290,104 @@ void HPF()
         struct Process *curProccess = popProcess();
         if (curProccess)
         {
-            int pid = fork();
-            if (pid == -1)
-                perror("error in fork");
-            else if (pid == 0)
-            {
-                char runtime[50];
-                sprintf(runtime, "%d", curProccess->runtime);
-                char *arg[] = {runtime, NULL};
-                execv("./process.out", arg);
-            }
-            else
-            {
-                processRunning = true;
-                curProcessId = curProccess->id;
-                pcb[curProcessId].wait = getClk() - curProccess->arrival;
-                pcb[curProcessId].pid = pid;
-                logProcess(curProcessId, "started", getClk());
-            }
+            int pid = runProcess(curProccess);
+            processRunning = true;
+            curProcessId = curProccess->id;
+            pcb[curProcessId].wait = getClk() - pcb[curProcessId].process.arrival;
+            pcb[curProcessId].pid = pid;
         }
     }
+}
+
+void STN()
+{
+    int rsv_value = receiveProcess(receivedProcess);
+    if (rsv_value != -1)
+    {
+        logProcess(receivedProcess->content.id, "arrived", getClk());
+        pushProcess(receivedProcess->content);
+        if (processRunning)
+        {
+            contextSwitching_STN();
+        }
+    }
+    if (!processRunning)
+    {
+        struct Process *curProccess = popProcess();
+        if (curProccess)
+        {
+
+            int pid = runProcess(curProccess);
+            processRunning = true;
+            curProcessId = curProccess->id;
+            pcb[curProcessId].pid = pid;
+        }
+    }
+}
+
+void contextSwitching_STN()
+{
+
+    kill(pcb[curProcessId].pid, SIGUSR1);
+    int curRemaining = getRemainingTime();
+    printf("curRemaining %d\n", curRemaining);
+    struct Process *process = getFrontProcess();
+    if (curRemaining == -1)
+    {
+        process = popProcess();
+        logProcess(curProcessId, "finished", getClk());
+        pcb[curProcessId].lastStopped = getClk();
+        pcb[curProcessId].remainingTime = 0;
+        curProcessId = process->id;
+        runProcess(process);
+        return;
+    }
+    if (curRemaining > process->runtime)
+    {
+        //switch
+        process = popProcess();
+        logProcess(curProcessId, "stopped", getClk());
+        pcb[curProcessId].lastStopped = getClk();
+        pcb[curProcessId].remainingTime = curRemaining;
+        pushProcess(pcb[curProcessId].process);
+        curProcessId = process->id;
+        runProcess(process);
+    }
+    else
+    {
+        printf("HKILL\n");
+        //kml
+        kill(pcb[curProcessId].pid, SIGCONT);
+    }
+}
+int runProcess(struct Process *curProccess)
+{
+    int pid;
+
+    if (pcb[curProccess->id].pid != -1)
+    {
+        pid = pcb[curProccess->id].pid;
+        logProcess(curProccess->id, "resumed", getClk());
+        pcb[curProcessId].wait += (getClk() - pcb[curProcessId].lastStopped);
+        kill(pid, SIGCONT);
+    }
+    else
+    {
+        pid = fork();
+        if (pid == -1)
+            perror("error in fork");
+        else if (pid == 0)
+        {
+            char runtime[50];
+            sprintf(runtime, "%d", curProccess->runtime);
+            char *arg[] = {runtime, NULL};
+            execv("./process.out", arg);
+        }
+        else
+        {
+            pcb[curProcessId].wait = (getClk() - pcb[curProcessId].lastStopped);
+            logProcess(curProccess->id, "started", getClk());
+        }
+    }
+    return pid;
 }

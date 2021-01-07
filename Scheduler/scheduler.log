@@ -5,11 +5,11 @@ At time  5  process  1 arrived  arr  5  total  3  remain  3  wait  0
 At time  5  process  1 started  arr  5  total  3  remain  3  wait  0
 At time  7  process  2 arrived  arr  7  total  2  remain  2  wait  0
 At time  8  process  1 finished  arr  5  total  3  remain  0  wait  0 ta 3  wta  1.000000
-At time  8  process  2 started  arr  7  total  2  remain  2  wait  1
 At time  8  process  3 arrived  arr  8  total  2  remain  2  wait  0
-At time  10  process  2 finished  arr  7  total  2  remain  0  wait  1 ta 3  wta  1.500000
-At time  10  process  3 started  arr  8  total  2  remain  2  wait  2
+At time  8  process  3 started  arr  8  total  2  remain  2  wait  0
+At time  10  process  3 finished  arr  8  total  2  remain  0  wait  0 ta 2  wta  1.000000
+At time  10  process  2 started  arr  7  total  2  remain  2  wait  0
 At time  11  process  4 arrived  arr  11  total  2  remain  2  wait  0
-At time  12  process  3 finished  arr  8  total  2  remain  0  wait  2 ta 4  wta  2.000000
-At time  12  process  4 started  arr  11  total  2  remain  2  wait  1
+At time  12  process  2 finished  arr  7  total  2  remain  0  wait  3 ta 5  wta  2.500000
+At time  12  process  4 started  arr  11  total  2  remain  2  wait  0
 At time  14  process  4 finished  arr  11  total  2  remain  0  wait  1 ta 3  wta  1.500000
