@@ -12,6 +12,7 @@ int main(int argc, char * argv[])
 	signal(SIGINT, clearResources);
 	gen_q_id = createQueue(GENERATOR_Q_KEY);
     struct ProcessBuff message;
+	message.header = 1;
     // TODO Initialization
     // 1. Read the input files.(done)
     int n = 0;
@@ -78,7 +79,7 @@ int main(int argc, char * argv[])
     	index++;
     } 
     // 2. Ask the user for the chosen scheduling algorithm and its parameters, if there are any.(done)
-    int pid1,pid2 ;
+    int pid1,pid2, algo = 0;
     char* Parameter,*Algo;
     printf("What is the Scheduling Algorthim you want to work with\n");
     printf("Enter:\n");
@@ -86,7 +87,14 @@ int main(int argc, char * argv[])
     printf("2 for Short job first\n");
     printf("3 for Round Robin\n");            
 	scanf("%s",Algo);
-	if(atoi(Algo) == 3)
+	algo = atoi(Algo);
+	while(algo < 1 || algo > 3)
+	{
+		printf("Please Enter a vaild Algorithm number: ");
+		scanf("%s",Algo);
+		algo = atoi(Algo);
+	}
+	if(algo == 3)
 	{
 		printf("Enter time slot for each process");
 		scanf("%s",Parameter);
@@ -126,8 +134,7 @@ int main(int argc, char * argv[])
 			{
 				// To get time use this
 				x = getClk();
-				
-				while(x >= Processes[index].arrival&&index < n)
+				while(x >= Processes[index].arrival && index < n)
     			{
     				// 6. Send the information to the scheduler at the appropriate time.
     				printf("%d : %d\n",x,Processes[index].arrival);//instead send
@@ -137,8 +144,8 @@ int main(int argc, char * argv[])
 					newProcess->content.arrival = Processes[index].arrival;
 					newProcess->content.priority = Processes[index].priority;
 					newProcess->content.runtime = Processes[index].runtime;
-					sendProcess(newProcess ,gen_q_id);
-    				index++;	
+					if(sendProcess(newProcess, gen_q_id) != -1)
+    					index++;
     			}	
 			}
 		}	
@@ -155,15 +162,16 @@ int main(int argc, char * argv[])
 */
 int createQueue(int key)
 {
+    printf("Create the generator Q\n");
     int q_id = msgget(key, 0666 | IPC_CREAT);
 	printf("generator subscribing to the generator Q,qid = %d\n",q_id);
     if(q_id == -1)
     {
-        printf("failed to connect to the generator Q:(\n");
+        printf("failed to Create the generator Q:(\n");
         exit(-1);
     }
-    else
-        return q_id;
+	printf("@gen: Q_id = %i\n", q_id);
+    return q_id;
 }
 
 /* 
@@ -174,9 +182,10 @@ int sendProcess(struct ProcessBuff * message, int q_id)
 {
     int status = msgsnd(q_id, message, sizeof(message->content), !IPC_NOWAIT);
 	if(status == -1)
-	{
 		printf("Failed to send the process @ Generator:(\n");
-	}
+	else
+		printf("sent from Generator\n");
+	
 	return status;
 }
 
@@ -185,6 +194,7 @@ int sendProcess(struct ProcessBuff * message, int q_id)
 */ 
 void clearResources(int signum)
 {
+	printf("Clear Resources @ Generator\n");
     msgctl(gen_q_id, IPC_RMID, (struct msqid_ds *)0);
     destroyClk(true);
     exit(0);

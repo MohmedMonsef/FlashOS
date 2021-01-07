@@ -28,7 +28,7 @@ void writeInFile(FILE* fp,char** params,int size);
 void insertPCB(struct Process* newProccess,int pid);
 
 int gen_q_id, shm_id, sem_id,curProcessId;
-int *shmaddr;
+int *sched_shmaddr;
 int schedulerType,processCount;
 bool processRunning=false;
 struct PCB* pcb;
@@ -40,6 +40,7 @@ int main(int argc, char * argv[])
     initClk();
     signal(SIGINT, clearResources);
     signal(SIGUSR2, handleChildExit);
+    struct ProcessBuff message;
     gen_q_id = createQueue(GENERATOR_Q_KEY);
     shm_id = createShmem(SCHEDULER_SHM_KEY);
     union Semun semun;
@@ -84,8 +85,8 @@ int createQueue(int key)
         printf("failed to connect to the generator Q:(\n");
         exit(-1);
     }
-    else
-        return q_id;
+    printf("Scheduler Subscribed to the generator Q, Q_id = %i\n", q_id);
+    return q_id;
 }
 
 /*
@@ -131,14 +132,14 @@ int createShmem(int key)
         printf("\nShared memory ID = %d\n", shmid);
 
     
-    shmaddr = (int *)shmat(shmid, (void *)0, 0);
-    if (*shmaddr == -1)
+    sched_shmaddr = (int *)shmat(shmid, (void *)0, 0);
+    if (*sched_shmaddr == -1)
     {
         perror("Error in attach in Scheduler:(\n");
         exit(-1);
     }
     else
-        printf("Scheduler: Shared memory attached at address %ls\n", shmaddr);
+        printf("Scheduler: Shared memory attached at address %ls\n", sched_shmaddr);
     return shm_id;
 }
 
@@ -197,18 +198,18 @@ int getRemainingTime()
 {
     printf("Getting rem time at Scheduler\n");
     down(sem_id);
-    printf("Remaining time = %i", *shmaddr);
-    return *shmaddr;
+    printf("Remaining time = %i", *sched_shmaddr);
+    return *sched_shmaddr;
 }
 
 void writer(int newMem)
 {
-    *shmaddr = newMem;
+    *sched_shmaddr = newMem;
 }
 
 int reader()
 {
-    return *shmaddr;
+    return *sched_shmaddr;
 }
 
 /*
@@ -218,6 +219,7 @@ int reader()
 */
 void clearResources(int signum)
 {
+    printf("Clear Resources @ Scheduler\n");
     semctl(sem_id, 0, IPC_RMID, (struct semid_ds *)0);
     shmctl(shm_id, IPC_RMID, (struct shmid_ds *)0);
     destroyClk(true);
