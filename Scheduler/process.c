@@ -11,7 +11,7 @@ union Semun
 };
 
 int attachShm(int key);
-int createSem(int key, union Semun * sem);
+int createSem(int key, union Semun *sem);
 void up(int sem_id);
 void down(int sem_id); //Not needed in the process
 void sendRemainingTime();
@@ -22,31 +22,29 @@ void clearResources(int signum);
 int remaining_time, shm_id, sem_id;
 int *sched_shmaddr;
 
-int main(int agrc, char * argv[])
+int main(int agrc, char *argv[])
 {
     initClk();
     signal(SIGUSR1, stopHandler);
     signal(SIGINT, clearResources);
     attachShm(SCHEDULER_SHM_KEY);
-   // union Semun semun;
+    // union Semun semun;
     //createSem(SEM_KEY, &semun);
     //TODO it needs to get the remaining time from somewhere
-    remaining_time=atoi(argv[0]);
+    remaining_time = atoi(argv[0]);
     int prevClk = getClk();
     while (remaining_time > 0)
     {
         int nxtClk = getClk();
-        if(nxtClk != prevClk){
+        if (nxtClk != prevClk)
+        {
             remaining_time--;
             prevClk = nxtClk;
         }
-
     }
-    
-    
+
     clearResources(0);
 }
-
 
 int attachShm(int key)
 {
@@ -60,7 +58,6 @@ int attachShm(int key)
     // else
     //     printf("\nShared memory ID = %d\n", shmid);
 
-    
     sched_shmaddr = (int *)shmat(shmid, (void *)0, 0);
     if (*sched_shmaddr == -1)
     {
@@ -72,7 +69,7 @@ int attachShm(int key)
     return shm_id;
 }
 
-int createSem(int key, union Semun * sem)
+int createSem(int key, union Semun *sem)
 {
     //1. Create Sems:
     int sem_id = semget(key, 1, 0666 | IPC_CREAT);
@@ -140,7 +137,6 @@ void stopHandler(int signum)
     printf("Process go to sleep\n");
     raise(SIGSTOP);
 }
-
 
 /*
  * Detach the shared memory.

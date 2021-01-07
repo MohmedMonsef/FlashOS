@@ -1,7 +1,5 @@
 #include "headers.h"
 
-
-
 /* arg for semctl system calls. */
 union Semun
 {
@@ -13,28 +11,27 @@ union Semun
 };
 
 int createQueue(int key);
-int receiveProcess(struct ProcessBuff * message);
-
+int receiveProcess(struct ProcessBuff *message);
 int createShmem(int key);
-int createSem(int key, union Semun * sem);
+int createSem(int key, union Semun *sem);
 void up(int sem_id); //Not needed in the scheduler
 void down(int sem_id);
 int getRemainingTime();
 void handleChildExit(int signum);
 void clearResources(int signum);
 void HPF();
-void logProcess(int id,char* status,int clk);
-void writeInFile(FILE* fp,char** params,int size);
-void insertPCB(struct Process* newProccess,int pid);
+void logProcess(int id, char *status, int clk);
+void writeInFile(char **params, int size);
+void insertPCB(struct Process newProccess, int pid);
 
-int gen_q_id, shm_id, sem_id,curProcessId;
+int gen_q_id, shm_id, sem_id, curProcessId;
 int *sched_shmaddr;
-int schedulerType,processCount;
-bool processRunning=false;
-struct PCB* pcb;
+int schedulerType, processCount;
+bool processRunning = false;
+struct PCB *pcb;
 FILE *fLog;
-
-int main(int argc, char * argv[])
+struct ProcessBuff *receivedProcess;
+int main(int argc, char *argv[])
 {
     key_t key_id;
     initClk();
@@ -45,26 +42,28 @@ int main(int argc, char * argv[])
     shm_id = createShmem(SCHEDULER_SHM_KEY);
     union Semun semun;
     sem_id = createSem(SEM_KEY, &semun);
-    //TODO implement the scheduler :)
     schedulerType = atoi(argv[0]);
     processCount = atoi(argv[1]);
-    pcb = (struct PCB*)malloc(processCount*sizeof(struct PCB));
-    if(schedulerType != 3){
-        createPriorityQueue(2-schedulerType);
+    pcb = (struct PCB *)malloc(processCount * sizeof(struct PCB));
+
+    if (schedulerType != 3)
+    {
+        createPriorityQueue(2 - schedulerType);
     }
-    //upon termination release the clock resources.
-    struct ProcessBuff* receivedProcess;
-    while(processCount){
-        if(schedulerType == 1)
+    receivedProcess = (struct ProcessBuff *)malloc(sizeof(struct ProcessBuff));
+    receivedProcess->header = 1;
+    fLog = fopen("scheduler.log", "w");
+    while (processCount)
+    {
+        if (schedulerType == 1)
         {
             HPF(receivedProcess);
         }
     }
-    clearResources(0);// I commented this cause it terminates the program as schedular not built yet
-
+    fclose(fLog);
+    //upon termination release the clock resources.
+    clearResources(0);
 }
-
-
 
 /*
  * IMPORTANT NOTES:
@@ -72,20 +71,18 @@ int main(int argc, char * argv[])
  * When the schedular wants to stop a process, it send a SIGUSR1 signal to it.
 */
 
-
 /* 
  * Return q_id on success and exit on failure.
 */
 int createQueue(int key)
 {
     int q_id = msgget(key, 0666 | IPC_CREAT);
-    printf("Schedular subscribing to the generator Q,qid = %d\n",q_id);
-    if(q_id == -1)
+    printf("Schedular subscribing to the generator Q,qid = %d\n", q_id);
+    if (q_id == -1)
     {
         printf("failed to connect to the generator Q:(\n");
         exit(-1);
     }
-    printf("Scheduler Subscribed to the generator Q, Q_id = %i\n", q_id);
     return q_id;
 }
 
@@ -94,14 +91,13 @@ int createQueue(int key)
  * Send the message to this function by reference.
  * NOTE: no wait is done here
 */
-int receiveProcess(struct ProcessBuff * message)
+int receiveProcess(struct ProcessBuff *message)
 {
-    // printf("Scheduler is Receiving a process\n");
-    int x= msgrcv(gen_q_id, message, sizeof(message->content), ALL, IPC_NOWAIT);
-    if(x != -1){
-        printf("logged\n");
-        // insertPCB(&message->content,-1);
-        // printf("received message, %d\n",message->content.id);
+    //printf("Scheduler is Receiving a process\n");
+    int x = msgrcv(gen_q_id, message, sizeof(message->content), ALL, IPC_NOWAIT);
+    if (x != -1)
+    {
+        insertPCB(message->content, -1);
     }
 
     return x;
@@ -113,9 +109,9 @@ int receiveProcess(struct ProcessBuff * message)
 void handleChildExit(int signum)
 {
     printf("Parent is notified of child exit.\n");
-  //  pcb[curProcessId].remainingTime=0;
-  //  logProcess(curProcessId,"finished",getClk());
-    processRunning=false;
+    pcb[curProcessId].remainingTime = 0;
+    logProcess(curProcessId, "finished", getClk());
+    processRunning = false;
     processCount--;
 }
 
@@ -131,7 +127,6 @@ int createShmem(int key)
     else
         printf("\nShared memory ID = %d\n", shmid);
 
-    
     sched_shmaddr = (int *)shmat(shmid, (void *)0, 0);
     if (*sched_shmaddr == -1)
     {
@@ -143,7 +138,7 @@ int createShmem(int key)
     return shm_id;
 }
 
-int createSem(int key, union Semun * sem)
+int createSem(int key, union Semun *sem)
 {
     //1. Create Sems:
     int sem_id = semget(key, 1, 0666 | IPC_CREAT);
@@ -227,82 +222,89 @@ void clearResources(int signum)
 }
 //pcb functions
 //insert
-void insertPCB(struct Process* newProccess,int pid){
-    int id=newProccess->id - 1;
-    printf("my id %d",id);
+void insertPCB(struct Process newProccess, int pid)
+{
+    int id = newProccess.id;
     pcb[id].process = newProccess;
     pcb[id].pid = pid;
-    pcb[id].remainingTime = newProccess->runtime;
+    pcb[id].remainingTime = newProccess.runtime;
 }
-//TODO 
-//delete
-
+//TODO
+//delete - should free the created process memory
 
 //writing in files
-
-void writeInFile(FILE* fp,char** params,int size){
-    fLog = fopen("scheduler.log", "w");
-    char* firstStrings[9]={"At time  ","  process  "," ","  arr  ","  total  ","  remain  ","  wait  "," ta ","  wta  "};
-    char* strOut= "";
-    for (int i=0;i<size;i++){
-        strcat(firstStrings[i],params[i]);
-        strcat(strOut,firstStrings[i]);
+void writeInFile(char **params, int size)
+{
+    char *firstStrings[9] = {"At time  ", "  process  ", " ", "  arr  ", "  total  ", "  remain  ", "  wait  ", " ta ", "  wta  "};
+    char *strOut = (char *)malloc(500);
+    for (int i = 0; i < size; i++)
+    {
+        strcat(strOut, firstStrings[i]);
+        strcat(strOut, params[i]);
     }
-    fwrite(strOut,sizeof(strOut) ,1, fp);
-    fclose(fLog);
+    fprintf(fLog, "%s\n", strOut);
 }
 
 //calc params for log file and write in it
 
-void logProcess(int id,char* status,int clk){
-    bool finished = strcmp(status,"finished");
-    int size=finished == 0 ?9:7;
-    char* params[9];
-    sprintf(params[0],"%d",clk);
-    sprintf(params[1],"%d",id);
-    params[2]=status;
-    sprintf(params[3],"%d",pcb[id].process->arrival);
-    sprintf(params[4],"%d",pcb[id].process->runtime);
-    sprintf(params[5],"%d",pcb[id].remainingTime);
-    sprintf(params[6],"%d",pcb[id].wait);
-    if(finished == 0){
-        int TA = clk - pcb[id].process->arrival;
-        float WTA = (float)TA/pcb[id].process->runtime;
-        WTA = (int)(WTA* 100 + .5); 
-        WTA= (float)WTA / 100;
-        sprintf(params[7],"%d",TA);
-        sprintf(params[8],"%f",WTA);
+void logProcess(int id, char *status, int clk)
+{
+    bool finished = strcmp(status, "finished");
+    int size = finished == 0 ? 9 : 7;
+    char *params[9];
+    for (int i = 0; i < 9; i++)
+    {
+        params[i] = (char *)malloc(50 * sizeof(char));
     }
-    writeInFile(fLog,params,size);
-
+    sprintf(params[0], "%d", clk);
+    sprintf(params[1], "%d", id);
+    params[2] = status;
+    sprintf(params[3], "%d", pcb[id].process.arrival);
+    sprintf(params[4], "%d", pcb[id].process.runtime);
+    sprintf(params[5], "%d", pcb[id].remainingTime);
+    sprintf(params[6], "%d", pcb[id].wait);
+    if (finished == 0)
+    {
+        int TA = clk - pcb[id].process.arrival;
+        float WTA = (float)TA / pcb[id].process.runtime;
+        WTA = (int)(WTA * 100 + .5);
+        WTA = (float)WTA / 100;
+        sprintf(params[7], "%d", TA);
+        sprintf(params[8], "%f", WTA);
+    }
+    writeInFile(params, size);
 }
-void HPF(struct ProcessBuff* receivedProcess){
-    int rsv_value=receiveProcess(receivedProcess);
-    if(rsv_value != -1 ){
-       // logProcess(receivedProcess->content.id,"arrived",getClk())
+void HPF()
+{
+    int rsv_value = receiveProcess(receivedProcess);
+
+    if (rsv_value != -1)
+    {
+        logProcess(receivedProcess->content.id, "arrived", getClk());
         pushProcess(receivedProcess->content);
     }
-    if(!processRunning){
+    if (!processRunning)
+    {
         struct Process *curProccess = popProcess();
-        if(curProccess){
+        if (curProccess)
+        {
             int pid = fork();
-            printf("hi\n");
-            curProcessId=curProccess->id;
-            if(pid == -1)
+            if (pid == -1)
                 perror("error in fork");
-            else if(pid == 0)
+            else if (pid == 0)
             {
-                printf("hi2\n");
-                char* runtime; 
-                sprintf(runtime, "%d", curProccess->runtime); 
-                char*arg[] = { runtime, NULL };
-                execv("./process.out",arg);
+                char runtime[50];
+                sprintf(runtime, "%d", curProccess->runtime);
+                char *arg[] = {runtime, NULL};
+                execv("./process.out", arg);
             }
-            else{
-                printf("hi3\n");
-              // pcb[curProcessId].wait= getClk() - curProccess->arrival;
-              // pcb[curProcessId].pid = pid;
-             //  logProcess(curProcessId,"started",getClk());
+            else
+            {
+                processRunning = true;
+                curProcessId = curProccess->id;
+                pcb[curProcessId].wait = getClk() - curProccess->arrival;
+                pcb[curProcessId].pid = pid;
+                logProcess(curProcessId, "started", getClk());
             }
         }
     }

@@ -39,7 +39,7 @@ struct RemainingTimeBuff
 
 struct PCB
 {
-    struct Process * process;
+    struct Process process;
     int pid;
     int remainingTime;
     int wait;

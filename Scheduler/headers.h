@@ -1,4 +1,4 @@
-#include <stdio.h>      //if you don't use scanf/printf change this include
+#include <stdio.h> //if you don't use scanf/printf change this include
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/file.h>
@@ -24,19 +24,16 @@ typedef short BOOLEAN;
 #define SEM_KEY 405
 #define ALL 0
 
-
 ///==============================
 //don't mess with this variable//
-int * shmaddr;                 //
+int *shmaddr; //
+int shmid;
 //===============================
-
-
 
 int getClk()
 {
     return *shmaddr;
 }
-
 
 /*
  * All process call this function at the beginning to establish communication between them and the clock module.
@@ -44,7 +41,7 @@ int getClk()
 */
 void initClk()
 {
-    int shmid = shmget(SHKEY, 4, 0444);
+    shmid = shmget(SHKEY, 4, 0444);
     while ((int)shmid == -1)
     {
         //Make sure that the clock exists
@@ -52,9 +49,8 @@ void initClk()
         sleep(1);
         shmid = shmget(SHKEY, 4, 0444);
     }
-    shmaddr = (int *) shmat(shmid, (void *)0, 0);
+    shmaddr = (int *)shmat(shmid, (void *)0, 0);
 }
-
 
 /*
  * All process call this function at the end to release the communication
@@ -69,6 +65,7 @@ void destroyClk(bool terminateAll)
     shmdt(shmaddr);
     if (terminateAll)
     {
+        shmctl(shmid, IPC_RMID, (struct shmid_ds *)0);
         killpg(getpgrp(), SIGINT);
     }
 }

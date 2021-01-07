@@ -119,20 +119,11 @@ struct Process *popProcess()
         {
             PriorityQueue->tail = NULL;
         }
-        free(del->head);
-        del->head = NULL;
-        del->tail = NULL;
-        del->nextList = NULL;
-        free(del);
-        del = NULL;
     }
     else
     {
         struct Node *del = PriorityQueue->front->head;
         PriorityQueue->front->head = PriorityQueue->front->head->next;
-        del->next = NULL;
-        free(del);
-        del = NULL;
     }
     return frontProcess;
 }

@@ -1,4 +1,4 @@
-#include "PriorityQueue.h"
+#include "../headers.h"
 struct Process process[10] = {{1, 3, 29, 8},
                               {2, 13, 8, 9},
                               {3, 16, 17, 3},
@@ -17,13 +17,9 @@ int main()
         pushProcess(process[i]);
     }
     displayQueue();
-    destructQueue();
-    printf("Start Delete\n");
-    createPriorityQueue(0);
     for (int i = 0; i < 10; i++)
     {
-        pushProcess(process[i]);
+        struct Process *p = popProcess(process[i]);
+        printf("cur process data %d  %d  %d  %d \n", p->id, p->arrival, p->priority, p->runtime);
     }
-    printf("is Empty = %d \n ", isEmpty());
-    displayQueue();
 }
