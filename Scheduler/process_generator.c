@@ -86,7 +86,6 @@ int main(int argc, char * argv[])
     printf("2 for Short job first\n");
     printf("3 for Round Robin\n");            
 	scanf("%s",Algo);
-	printf("%s in generator\n",Algo);
 	if(atoi(Algo) == 3)
 	{
 		printf("Enter time slot for each process");
@@ -99,7 +98,9 @@ int main(int argc, char * argv[])
 	else if(pid1 == 0)
 	{
 		// schedular
-		char*a[] = { Algo ,Parameter , NULL };
+		char* pcbSize;
+		sprintf(pcbSize,"%d",n);
+		char*a[] = { Algo , pcbSize ,Parameter , NULL };
 		execv("./scheduler.out",a);
 	}
 	else
@@ -129,10 +130,13 @@ int main(int argc, char * argv[])
 				while(x >= Processes[index].arrival&&index < n)
     			{
     				// 6. Send the information to the scheduler at the appropriate time.
-    				printf("%d %d\n",x,Processes[index].arrival);//instead send
+    				printf("%d : %d\n",x,Processes[index].arrival);//instead send
 					struct ProcessBuff * newProcess;
 					newProcess->header = 1;
-					newProcess->content = Processes[index];
+					newProcess->content.id = Processes[index].id;
+					newProcess->content.arrival = Processes[index].arrival;
+					newProcess->content.priority = Processes[index].priority;
+					newProcess->content.runtime = Processes[index].runtime;
 					sendProcess(newProcess ,gen_q_id);
     				index++;	
     			}	

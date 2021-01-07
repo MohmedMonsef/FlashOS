@@ -36,3 +36,12 @@ struct RemainingTimeBuff
     long header;
     int content;
 };
+
+struct PCB
+{
+    struct Process * process;
+    int pid;
+    int remainingTime;
+    int wait;
+    int lastStopped;
+};

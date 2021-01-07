@@ -28,8 +28,8 @@ int main(int agrc, char * argv[])
     signal(SIGUSR1, stopHandler);
     signal(SIGINT, clearResources);
     attachShm(SCHEDULER_SHM_KEY);
-    union Semun semun;
-    createSem(SEM_KEY, &semun);
+   // union Semun semun;
+    //createSem(SEM_KEY, &semun);
     //TODO it needs to get the remaining time from somewhere
     remaining_time=atoi(argv[0]);
     int prevClk = getClk();
@@ -57,8 +57,8 @@ int attachShm(int key)
         perror("Error in creating the shared memory @ Process:(\n");
         exit(-1);
     }
-    else
-        printf("\nShared memory ID = %d\n", shmid);
+    // else
+    //     printf("\nShared memory ID = %d\n", shmid);
 
     
     shmaddr = (int *)shmat(shmid, (void *)0, 0);
@@ -67,8 +67,8 @@ int attachShm(int key)
         perror("Error in attach in Process:(\n");
         exit(-1);
     }
-    else
-        printf("Process: Shared memory attached at address %ls\n", shmaddr);
+    // else
+    //     printf("Process: Shared memory attached at address %ls\n", shmaddr);
     return shm_id;
 }
 

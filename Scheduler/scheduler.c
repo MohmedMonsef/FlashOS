@@ -20,18 +20,22 @@ int createSem(int key, union Semun * sem);
 void up(int sem_id); //Not needed in the scheduler
 void down(int sem_id);
 int getRemainingTime();
-
 void handleChildExit(int signum);
 void clearResources(int signum);
 void HPF();
+void logProcess(int id,char* status,int clk);
+void writeInFile(FILE* fp,char** params,int size);
+void insertPCB(struct Process* newProccess,int pid);
 
-int gen_q_id, shm_id, sem_id;
+int gen_q_id, shm_id, sem_id,curProcessId;
 int *shmaddr;
-int schedulerType;
+int schedulerType,processCount;
 bool processRunning=false;
+struct PCB* pcb;
+FILE *fLog;
+
 int main(int argc, char * argv[])
 {
-    printf("in Shedueler\n");
     key_t key_id;
     initClk();
     signal(SIGINT, clearResources);
@@ -42,19 +46,20 @@ int main(int argc, char * argv[])
     sem_id = createSem(SEM_KEY, &semun);
     //TODO implement the scheduler :)
     schedulerType = atoi(argv[0]);
-    printf("schedulerType %d , %s ,argc %d\n",schedulerType,argv[0],argc);
+    processCount = atoi(argv[1]);
+    pcb = (struct PCB*)malloc(processCount*sizeof(struct PCB));
     if(schedulerType != 3){
         createPriorityQueue(2-schedulerType);
     }
     //upon termination release the clock resources.
     struct ProcessBuff* receivedProcess;
-    while(1){
+    while(processCount){
         if(schedulerType == 1)
         {
             HPF(receivedProcess);
         }
     }
-    //clearResources(0); I commented this cause it terminates the program as schedular not built yet
+    clearResources(0);// I commented this cause it terminates the program as schedular not built yet
 
 }
 
@@ -92,7 +97,12 @@ int receiveProcess(struct ProcessBuff * message)
 {
     // printf("Scheduler is Receiving a process\n");
     int x= msgrcv(gen_q_id, message, sizeof(message->content), ALL, IPC_NOWAIT);
-    printf("received message, %d\n",message->content.id);
+    if(x != -1){
+        printf("logged\n");
+        // insertPCB(&message->content,-1);
+        // printf("received message, %d\n",message->content.id);
+    }
+
     return x;
 }
 
@@ -102,7 +112,10 @@ int receiveProcess(struct ProcessBuff * message)
 void handleChildExit(int signum)
 {
     printf("Parent is notified of child exit.\n");
+  //  pcb[curProcessId].remainingTime=0;
+  //  logProcess(curProcessId,"finished",getClk());
     processRunning=false;
+    processCount--;
 }
 
 int createShmem(int key)
@@ -210,28 +223,84 @@ void clearResources(int signum)
     destroyClk(true);
     exit(0);
 }
+//pcb functions
+//insert
+void insertPCB(struct Process* newProccess,int pid){
+    int id=newProccess->id - 1;
+    printf("my id %d",id);
+    pcb[id].process = newProccess;
+    pcb[id].pid = pid;
+    pcb[id].remainingTime = newProccess->runtime;
+}
+//TODO 
+//delete
 
+
+//writing in files
+
+void writeInFile(FILE* fp,char** params,int size){
+    fLog = fopen("scheduler.log", "w");
+    char* firstStrings[9]={"At time  ","  process  "," ","  arr  ","  total  ","  remain  ","  wait  "," ta ","  wta  "};
+    char* strOut= "";
+    for (int i=0;i<size;i++){
+        strcat(firstStrings[i],params[i]);
+        strcat(strOut,firstStrings[i]);
+    }
+    fwrite(strOut,sizeof(strOut) ,1, fp);
+    fclose(fLog);
+}
+
+//calc params for log file and write in it
+
+void logProcess(int id,char* status,int clk){
+    bool finished = strcmp(status,"finished");
+    int size=finished == 0 ?9:7;
+    char* params[9];
+    sprintf(params[0],"%d",clk);
+    sprintf(params[1],"%d",id);
+    params[2]=status;
+    sprintf(params[3],"%d",pcb[id].process->arrival);
+    sprintf(params[4],"%d",pcb[id].process->runtime);
+    sprintf(params[5],"%d",pcb[id].remainingTime);
+    sprintf(params[6],"%d",pcb[id].wait);
+    if(finished == 0){
+        int TA = clk - pcb[id].process->arrival;
+        float WTA = (float)TA/pcb[id].process->runtime;
+        WTA = (int)(WTA* 100 + .5); 
+        WTA= (float)WTA / 100;
+        sprintf(params[7],"%d",TA);
+        sprintf(params[8],"%f",WTA);
+    }
+    writeInFile(fLog,params,size);
+
+}
 void HPF(struct ProcessBuff* receivedProcess){
-    // receivedProcess=NULL;
     int rsv_value=receiveProcess(receivedProcess);
-    // printf("rsv_value %d\n",rsv_value);
-    if(rsv_value !=1){
-        printf("new process %d\n",receivedProcess->content.id);
+    if(rsv_value != -1 ){
+       // logProcess(receivedProcess->content.id,"arrived",getClk())
         pushProcess(receivedProcess->content);
     }
     if(!processRunning){
         struct Process *curProccess = popProcess();
         if(curProccess){
             int pid = fork();
+            printf("hi\n");
+            curProcessId=curProccess->id;
             if(pid == -1)
                 perror("error in fork");
             else if(pid == 0)
             {
-
-                char runtime[50]; 
+                printf("hi2\n");
+                char* runtime; 
                 sprintf(runtime, "%d", curProccess->runtime); 
                 char*arg[] = { runtime, NULL };
                 execv("./process.out",arg);
+            }
+            else{
+                printf("hi3\n");
+              // pcb[curProcessId].wait= getClk() - curProccess->arrival;
+              // pcb[curProcessId].pid = pid;
+             //  logProcess(curProcessId,"started",getClk());
             }
         }
     }
