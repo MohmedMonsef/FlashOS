@@ -1,10 +1,24 @@
 #include "headers.h"
 
+/* arg for semctl system calls. */
+union Semun
+{
+    int val;               /* value for SETVAL */
+    struct semid_ds *buf;  /* buffer for IPC_STAT & IPC_SET */
+    ushort *array;         /* array for GETALL & SETALL */
+    struct seminfo *__buf; /* buffer for IPC_INFO */
+    void *__pad;
+};
+
 void clearResources(int signum);
 int createQueue(int key);
 int sendProcess(struct ProcessBuff *message, int q_id);
 
-int gen_q_id;
+void createSem(int key, union Semun *sem);
+void up();
+void down();
+
+int gen_q_id, gen_sem_id;
 
 int main(int argc, char *argv[])
 {
@@ -12,6 +26,8 @@ int main(int argc, char *argv[])
 	gen_q_id = createQueue(GENERATOR_Q_KEY);
 	struct ProcessBuff message;
 	message.header = 1;
+	union Semun semun;
+	createSem(GEN_SEM_KEY, &semun);
 	// TODO Initialization
 	// 1. Read the input files.(done)
 	int n = 0;
@@ -128,7 +144,8 @@ int main(int argc, char *argv[])
 			// 4. Use this function after creating the clock process to initialize clock
 			initClk();
 			// TODO Generation Main Loop
-			int x;
+			int x, prev_time = -1 ;
+			bool allowed_up=false;
 			while (index < n)
 			{
 				// To get time use this
@@ -136,19 +153,30 @@ int main(int argc, char *argv[])
 				while (x >= Processes[index].arrival && index < n)
 				{
 					// 6. Send the information to the scheduler at the appropriate time.
-					printf("%d : %d\n", x, Processes[index].arrival); //instead send
+					printf("%d : %d\n", x, Processes[index].id); //instead send
 					struct ProcessBuff *newProcess = (struct ProcessBuff *)malloc(sizeof(struct ProcessBuff));
 					struct Process p = {Processes[index].id - 1, Processes[index].arrival, Processes[index].runtime, Processes[index].priority};
 					newProcess->header = 1;
 					newProcess->content = p;
 					if (sendProcess(newProcess, gen_q_id) != -1)
 						index++;
+					allowed_up = true;
 				}
+				if(allowed_up || x > prev_time)
+				{
+					up();
+					allowed_up = false;
+					prev_time = x;
+				}
+				
 			}
+			//When all proceeses are sent, don't make the scheduler wait for you:
+			kill(pid1, SIGUSR1);
 		}
 	}
+
 	// 7. Clear clock resources
-	// Sleep untill being interrupted or the Scheduler exits.
+	// wait untill being interrupted or the Scheduler exits.
 	int status;
 	waitpid(pid1, &status, 0);
 	clearResources(0);
@@ -181,10 +209,61 @@ int sendProcess(struct ProcessBuff *message, int q_id)
 	if (status == -1)
 		printf("Failed to send the process @ Generator:(\n");
 	else
-		printf("sent from Generator\n");
+		//printf("sent from Generator\n");
 
 	return status;
 }
+
+void createSem(int key, union Semun *sem)
+{
+    //1. Create Sems:
+    gen_sem_id = semget(key, 1, 0666 | IPC_CREAT);
+
+    if (gen_sem_id == -1)
+    {
+        perror("Error in create the semaphor at scheduler:(\n");
+        exit(-1);
+    }
+
+    sem->val = 0; /* initial value of the semaphore, Binary semaphore */
+    if (semctl(gen_sem_id, 0, SETVAL, *sem) == -1)
+    {
+        perror("Error in semctl: set value\n");
+        exit(-1);
+    }
+}
+
+void down()
+{
+    struct sembuf p_op;
+
+    p_op.sem_num = 0;
+    p_op.sem_op = -1;
+    p_op.sem_flg = !IPC_NOWAIT;
+
+    if (semop(gen_sem_id, &p_op, 1) == -1)
+    {
+        perror("Error in down() at Process:(\n");
+        exit(-1);
+    }
+}
+
+void up()
+{
+    struct sembuf v_op;
+
+    v_op.sem_num = 0;
+    v_op.sem_op = 1;
+    v_op.sem_flg = !IPC_NOWAIT;
+
+    if (semop(gen_sem_id, &v_op, 1) == -1)
+    {
+        perror("Error in up() at Process:(\n");
+        exit(-1);
+    }
+	printf("up generator\n");
+}
+
 
 /*
  * Clear all resources(Generator Q, Clk, Terminate all)

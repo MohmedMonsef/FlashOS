@@ -21,15 +21,18 @@ void clearResources(int signum);
 
 int remaining_time, shm_id, sem_id;
 int *sched_shmaddr;
+union Semun semun;
 
 int main(int agrc, char *argv[])
 {
+    printf("New process forked\n");
+    //kill(getppid(), SIGCONT);
     initClk();
     signal(SIGUSR1, stopHandler);
     signal(SIGINT, clearResources);
     attachShm(SCHEDULER_SHM_KEY);
-    union Semun semun;
-    createSem(SEM_KEY, &semun);
+    
+    createSem(SCHED_SEM_KEY, &semun);
     //TODO it needs to get the remaining time from somewhere
     remaining_time = atoi(argv[0]);
     int prevClk = getClk();
@@ -39,6 +42,12 @@ int main(int agrc, char *argv[])
         if (nxtClk != prevClk)
         {
             remaining_time--;
+            *sched_shmaddr = remaining_time;
+            if(remaining_time != 0){
+                up();
+            }
+
+            printf("___Remaining time = %i\n", remaining_time);
             prevClk = nxtClk;
         }
     }
@@ -116,6 +125,7 @@ void up()
         perror("Error in up() at Process:(\n");
         exit(-1);
     }
+    printf("up process\n");
 }
 
 void sendRemainingTime()
@@ -131,7 +141,7 @@ void sendRemainingTime()
 */
 void stopHandler(int signum)
 {
-    sendRemainingTime();
+    //sendRemainingTime();
     printf("Process go to sleep\n");
     raise(SIGSTOP);
 }
@@ -144,8 +154,10 @@ void stopHandler(int signum)
 */
 void clearResources(int signum)
 {
+    printf("Current process is exiting\n");
     shmdt(sched_shmaddr);
-    kill(getppid(), SIGUSR2);
     destroyClk(false);
+    kill(getppid(), SIGUSR2);
+    printf("Notified Parent and exiting..\n");
     exit(0);
 }

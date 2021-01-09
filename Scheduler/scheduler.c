@@ -1,4 +1,5 @@
 #include "headers.h"
+#include <errno.h>
 
 /* arg for semctl system calls. */
 union Semun
@@ -12,39 +13,52 @@ union Semun
 
 int createQueue(int key);
 int receiveProcess(struct ProcessBuff *message);
+
 int createShmem(int key);
-void createSem(int key, union Semun *sem);
-void up(); //Not needed in the scheduler
-void down();
+int createSem(int key, union Semun *sem);
+void up(int sem_id); //Not needed in the scheduler
+void down(int sem_id);
 int getRemainingTime();
+
 void handleChildExit(int signum);
 void clearResources(int signum);
+void handleGenFinish(int signum);
+
 void HPF();
 void STN();
+
 void logProcess(int id, char *status, int clk);
 void writeInFile(char **params, int size);
 void insertPCB(struct Process newProccess, int pid);
 int runProcess(struct Process *curProccess);
 void contextSwitching_STN();
-int gen_q_id, shm_id, sem_id, curProcessId;
+
+int gen_q_id, shm_id, sem_id, curProcessId, gen_sem_id;
 int *sched_shmaddr;
 int schedulerType, processCount;
-bool processRunning = false;
+bool processRunning = false, waitGen = true;
 struct sembuf p_op;
 struct PCB *pcb;
 FILE *fLog;
 struct ProcessBuff *receivedProcess;
+union Semun semun;
+
 int main(int argc, char *argv[])
 {
     key_t key_id;
     initClk();
     signal(SIGINT, clearResources);
     signal(SIGUSR2, handleChildExit);
+    signal(SIGUSR1, handleGenFinish);
+
     struct ProcessBuff message;
     gen_q_id = createQueue(GENERATOR_Q_KEY);
+
     shm_id = createShmem(SCHEDULER_SHM_KEY);
-    union Semun semun;
-    createSem(SEM_KEY, &semun);
+    sem_id = createSem(SCHED_SEM_KEY, &semun);
+    union Semun gen_semun;
+    gen_sem_id = createSem(GEN_SEM_KEY, &gen_semun);
+
     schedulerType = atoi(argv[0]);
     processCount = atoi(argv[1]);
     pcb = (struct PCB *)malloc(processCount * sizeof(struct PCB));
@@ -58,12 +72,23 @@ int main(int argc, char *argv[])
     fLog = fopen("scheduler.log", "w");
     while (processCount)
     {
+
         if (schedulerType == 1)
         {
             HPF();
         }
         else if (schedulerType == 2)
         {
+            if(waitGen)
+            {
+                printf("Try down gen\n");
+                down(gen_sem_id);
+            }
+            if(processRunning)
+            {
+                printf("Try down process\n");
+                down(sem_id);
+            }
             STN();
         }
     }
@@ -146,10 +171,10 @@ int createShmem(int key)
     return shm_id;
 }
 
-void createSem(int key, union Semun *sem)
+int createSem(int key, union Semun *sem)
 {
     //1. Create Sems:
-    sem_id = semget(key, 1, 0666 | IPC_CREAT);
+    int sem_id = semget(key, 1, 0666 | IPC_CREAT);
 
     if (sem_id == -1)
     {
@@ -163,9 +188,10 @@ void createSem(int key, union Semun *sem)
         perror("Error in semctl: set value\n");
         exit(-1);
     }
+    return sem_id;
 }
 
-void down()
+void down(int sem_id)
 {
 
     p_op.sem_num = 0;
@@ -174,12 +200,24 @@ void down()
 
     if (semop(sem_id, &p_op, 1) == -1)
     {
-        perror("Error in down() at Schedular:(\n");
-        exit(-1);
+        if(errno != EINTR)
+        {
+            perror("Error in down() at Schedular:(\n");
+            if(sem_id == gen_sem_id)
+                printf("Generator Baz");
+            else
+                printf("Scheduler Baz");
+
+            exit(-1);
+        }
     }
+    if(sem_id == gen_sem_id)
+        printf("down generator\n");
+    else
+        printf("Down process\n");   
 }
 
-void up()
+void up(int sem_id)
 {
     struct sembuf v_op;
 
@@ -192,10 +230,11 @@ void up()
         perror("Error in up() at Scheduler:(\n");
         exit(-1);
     }
+    printf("Up scheduler");
 }
 
 int getRemainingTime()
-{
+{/*
     printf("B READ\n");
     if (processRunning)
     {
@@ -206,6 +245,13 @@ int getRemainingTime()
         return rem;
     }
     return -1;
+*/
+    printf("B READ\n");
+    down(sem_id);
+    int rem = *sched_shmaddr;
+    //up();
+    printf("Getting rem time at Scheduler\n");
+    return rem;
 }
 
 /*
@@ -217,6 +263,7 @@ void clearResources(int signum)
 {
     printf("Clear Resources @ Scheduler\n");
     semctl(sem_id, 0, IPC_RMID, (struct semid_ds *)0);
+    semctl(gen_sem_id, 0, IPC_RMID, (struct semid_ds *)0);
     shmctl(shm_id, IPC_RMID, (struct shmid_ds *)0);
     destroyClk(true);
     exit(0);
@@ -301,18 +348,24 @@ void HPF()
 
 void STN()
 {
+    printf("Enter STN\n");
     int rsv_value = receiveProcess(receivedProcess);
-    if (rsv_value != -1)
+    bool received = false;
+    while (rsv_value != -1)
     {
+        received = true;
+        printf("Received id = %i\n", receivedProcess->content.id+1);
         logProcess(receivedProcess->content.id, "arrived", getClk());
         pushProcess(receivedProcess->content);
-        if (processRunning)
-        {
-            contextSwitching_STN();
-        }
+        rsv_value = receiveProcess(receivedProcess);
+    }
+    if (processRunning && received)//&& (*sched_shmaddr > 1))
+    {
+        contextSwitching_STN();
     }
     if (!processRunning)
     {
+        printf("Enter Process not running so add new one.\n");
         struct Process *curProccess = popProcess();
         if (curProccess)
         {
@@ -323,15 +376,23 @@ void STN()
             pcb[curProcessId].pid = pid;
         }
     }
+
+
 }
 
 void contextSwitching_STN()
 {
-
-    kill(pcb[curProcessId].pid, SIGUSR1);
+    printf("Enter context switching\n");
+    /*
+    printf("Stop the current process to compare.\n");
+    int what = kill(pcb[curProcessId].pid, SIGUSR1);
+    printf("the sent kill = %i\n", what);
     int curRemaining = getRemainingTime();
+    */
+   int curRemaining = *sched_shmaddr;
     printf("curRemaining %d\n", curRemaining);
     struct Process *process = getFrontProcess();
+    /*
     if (curRemaining == -1)
     {
         process = popProcess();
@@ -342,9 +403,12 @@ void contextSwitching_STN()
         runProcess(process);
         return;
     }
+    */
     if (curRemaining > process->runtime)
     {
         //switch
+        printf("Switch\n");
+        kill(pcb[curProcessId].pid, SIGUSR1);
         process = popProcess();
         logProcess(curProcessId, "stopped", getClk());
         pcb[curProcessId].lastStopped = getClk();
@@ -355,9 +419,9 @@ void contextSwitching_STN()
     }
     else
     {
-        printf("HKILL\n");
+        printf("kml current\n");
         //kml
-        kill(pcb[curProcessId].pid, SIGCONT);
+        //kill(pcb[curProcessId].pid, SIGCONT);
     }
 }
 int runProcess(struct Process *curProccess)
@@ -377,7 +441,7 @@ int runProcess(struct Process *curProccess)
         if (pid == -1)
             perror("error in fork");
         else if (pid == 0)
-        {
+        {   //sleep(1);
             char runtime[50];
             sprintf(runtime, "%d", curProccess->runtime);
             char *arg[] = {runtime, NULL};
@@ -389,5 +453,12 @@ int runProcess(struct Process *curProccess)
             logProcess(curProccess->id, "started", getClk());
         }
     }
+    printf("New Process entered, id = %i\n", curProccess->id+1);
     return pid;
+}
+
+void handleGenFinish(int signum)
+{
+    waitGen = false;
+    printf("wait Gen = false.\n");
 }

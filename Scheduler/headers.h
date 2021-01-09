@@ -20,8 +20,9 @@ typedef short BOOLEAN;
 
 #define SHKEY 300
 #define GENERATOR_Q_KEY 114
+#define GEN_SEM_KEY 115
 #define SCHEDULER_SHM_KEY 404
-#define SEM_KEY 405
+#define SCHED_SEM_KEY 405
 #define ALL 0
 
 ///==============================
