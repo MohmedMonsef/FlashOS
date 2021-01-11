@@ -16,13 +16,15 @@ void up();
 void down(); //Not needed in the process
 void sendRemainingTime();
 
+void contHandler(int signum);
 void stopHandler(int signum);
 void clearResources(int signum);
 
 int remaining_time, shm_id, sem_id;
 int *sched_shmaddr;
 union Semun semun;
-
+int prevClk, nxtClk;
+int globalRemaining;
 int main(int agrc, char *argv[])
 {
     printf("New process forked\n");
@@ -30,20 +32,24 @@ int main(int agrc, char *argv[])
     initClk();
     signal(SIGUSR1, stopHandler);
     signal(SIGINT, clearResources);
+    signal(SIGCONT, contHandler);
     attachShm(SCHEDULER_SHM_KEY);
-    
+
     createSem(SCHED_SEM_KEY, &semun);
     //TODO it needs to get the remaining time from somewhere
     remaining_time = atoi(argv[0]);
-    int prevClk = getClk();
+    prevClk = getClk();
     while (remaining_time > 0)
     {
-        int nxtClk = getClk();
+        nxtClk = getClk();
         if (nxtClk != prevClk)
         {
             remaining_time--;
             *sched_shmaddr = remaining_time;
-            if(remaining_time != 0){
+
+            if (remaining_time != 0)
+            {
+                globalRemaining = remaining_time;
                 up();
             }
 
@@ -142,8 +148,18 @@ void sendRemainingTime()
 void stopHandler(int signum)
 {
     //sendRemainingTime();
+    //ToBeFixed : Remaining Time That The scheduler reads in real needs to be sent in SIGCONT
+    remaining_time = globalRemaining;
     printf("Process go to sleep\n");
     raise(SIGSTOP);
+}
+
+void contHandler(int signum)
+{
+    prevClk = getClk();
+    nxtClk = getClk();
+    signal(SIGCONT, SIG_DFL);
+    raise(SIGCONT);
 }
 
 /*

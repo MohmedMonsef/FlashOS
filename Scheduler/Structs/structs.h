@@ -41,7 +41,7 @@ struct PCB
 {
     struct Process process;
     int pid;
-    int remainingTime;
+    int totalRunTime;
     int wait;
     int lastStopped;
 };
