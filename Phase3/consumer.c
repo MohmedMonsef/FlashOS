@@ -6,6 +6,7 @@
 #include <sys/msg.h>
 #include <sys/wait.h>
 #include <sys/types.h>
+#include<errno.h>
 union Semun
 {
     int val;               /* value for SETVAL */
@@ -25,6 +26,7 @@ int createShmem(int key);
 int createSem(int key, union Semun *sem);
 void up(int sem_id); //Not needed in the scheduler
 void down(int sem_id);
+void clearResources(int signum);
 /* Producer/consumer program illustrating conditional variables */
 /*keys*/
 #define Q_KEY 114
@@ -37,13 +39,44 @@ union Semun mutex_semun;
 #define BUF_SIZE 3
 struct Buffer 
 {
-    int buffer[BUF_SIZE];							        /* shared buffer */
-    int add=0;										/* place to add next element */
-    int rem=0;										/* place to remove next element */
-    int num=0;										/* number elements in buffer */
-}
+    int* buffer;							        /* shared buffer */
+    int add;										/* place to add next element */
+    int rem;										/* place to remove next element */
+    int num;										/* number elements in buffer */
+};
 struct Buffer *buf;
-int to_be_added=0;										/*next number to be added*/
+
+int main()
+{
+    signal(SIGINT, clearResources);
+    q_id = createQueue(Q_KEY);
+    shm_id = createShmem(SHM_KEY);
+    mutex_sem_id = createSem(MUTEX_SEM_KEY, &mutex_semun);
+    struct msgbuff message;
+    while(1)
+    {
+        /*check if empty*/
+        if(num == 0)
+        {
+            printf("empty\n");
+            //wait for message
+    	    int rec_val = msgrcv(up, &message, sizeof(message.mtext), 0, !IPC_NOWAIT);
+            if (rec_val == -1)
+                perror("Error in receive");
+        }
+        /*down_mutex_sem*/
+        down(mutex_sem_id);
+        /*remove item from buffer*/
+        buf ->rem ++;
+        if(num == BUF_SIZE)
+        {
+            //sendmessage
+        }
+        buf->num --;
+        /*up mutex sem*/
+        up(mutex_sem_id);
+    }
+}
 
 
 int main()
@@ -52,22 +85,35 @@ int main()
     q_id = createQueue(Q_KEY);
     shm_id = createShmem(SHM_KEY);
     mutex_sem_id = createSem(MUTEX_SEM_KEY, &mutex_semun);
-    while(true)
+    int item;
+    struct msgbuff message;
+    while(1)
     {
-        /*check if empty*/
-        if(num == 0)
+        /*produce_item*/
+        item = to_be_added;
+        /*check if full*/
+        if(buf->num == BUF_SIZE)
         {
             //wait for message
-    	    rec_val = msgrcv(up, &message, sizeof(message.mtext), 0, !IPC_NOWAIT);
+            printf("full \n");
+    	    int rec_val = msgrcv(q_id, &message, sizeof(message.mtext), 0, !IPC_NOWAIT);
             if (rec_val == -1)
                 perror("Error in receive");
         }
         /*down_mutex_sem*/
         down(mutex_sem_id);
-        /*remove item from buffer*/
-        buf ->rem ++;
+        /*add item to buffer*/
+        printf("item produced : %d",item);
+        to_be_added++;
+        buf ->buffer[buf->add] = item;
+        buf->add++;
+        if(buf->num == 0)
+        {
+            //send message to say its not empty
+        }
+        buf->num++;
         /*up mutex sem*/
-        /*up_empty_sem*/
+        up(mutex_sem_id);
     }
 }
 
@@ -96,13 +142,16 @@ int createShmem(int key)
         exit(-1);
     }
 
-    buf = (int *)shmat(shmid, (void *)0, 0);
-    if (*buffer == -1)
+    buf = shmat(shmid, (void *)0, 0);
+    if (buf == (struct Buffer*)-1)
     {
         perror("Error in attach :(\n");
         exit(-1);
     }
-    buffer = malloc(sizeof(int)*BUF_SIZE);
+    buf->buffer = malloc(sizeof(int)*BUF_SIZE);
+    buf->num=0;
+    buf->add=0;
+    buf->rem=0;
     return shm_id;
 }
 
@@ -117,9 +166,7 @@ int createSem(int key, union Semun *sem)
         exit(-1);
     }
     /* initial value of the semaphore, Binary semaphore */
-    if(key == MUTEX_SEM_KEY) sem->val = 0;
-    else if(key == EMPTY_SEM_KEY) sem->val = BUF_SIZE;
-    else sem->val = 1; 
+    sem->val = 1;
     if (semctl(sem_id, 0, SETVAL, *sem) == -1)
     {
         perror("Error in semctl: set value\n");
@@ -131,11 +178,11 @@ int createSem(int key, union Semun *sem)
 void down(int sem_id)
 {
     struct sembuf v_op;
-    p_op.sem_num = 0;
-    p_op.sem_op = -1;
-    p_op.sem_flg = (!IPC_NOWAIT);
+    v_op.sem_num = 0;
+    v_op.sem_op = -1;
+    v_op.sem_flg = (!IPC_NOWAIT);
 
-    if (semop(sem_id, &p_op, 1) == -1)
+    if (semop(sem_id, &v_op, 1) == -1)
     {
         if (errno != EINTR)
         {
@@ -167,5 +214,3 @@ void clearResources(int signum)
     shmctl(shm_id, IPC_RMID, (struct shmid_ds *)0);
     exit(0);
 }
-
-
