@@ -6,6 +6,7 @@
 #include <sys/msg.h>
 #include <sys/wait.h>
 #include <sys/types.h>
+#include <unistd.h>
 #include<errno.h>
 union Semun
 {
@@ -56,7 +57,7 @@ int main()
     while(1)
     {
         /*check if empty*/
-        if(num == 0)
+        if(buf->num == 0)
         {
             printf("empty\n");
             //wait for message
@@ -68,7 +69,7 @@ int main()
         down(mutex_sem_id);
         /*remove item from buffer*/
         buf ->rem ++;
-        if(num == BUF_SIZE)
+        if(buf->num == BUF_SIZE)
         {
             //sendmessage
         }
@@ -77,46 +78,6 @@ int main()
         up(mutex_sem_id);
     }
 }
-
-
-int main()
-{
-    signal(SIGINT, clearResources);
-    q_id = createQueue(Q_KEY);
-    shm_id = createShmem(SHM_KEY);
-    mutex_sem_id = createSem(MUTEX_SEM_KEY, &mutex_semun);
-    int item;
-    struct msgbuff message;
-    while(1)
-    {
-        /*produce_item*/
-        item = to_be_added;
-        /*check if full*/
-        if(buf->num == BUF_SIZE)
-        {
-            //wait for message
-            printf("full \n");
-    	    int rec_val = msgrcv(q_id, &message, sizeof(message.mtext), 0, !IPC_NOWAIT);
-            if (rec_val == -1)
-                perror("Error in receive");
-        }
-        /*down_mutex_sem*/
-        down(mutex_sem_id);
-        /*add item to buffer*/
-        printf("item produced : %d",item);
-        to_be_added++;
-        buf ->buffer[buf->add] = item;
-        buf->add++;
-        if(buf->num == 0)
-        {
-            //send message to say its not empty
-        }
-        buf->num++;
-        /*up mutex sem*/
-        up(mutex_sem_id);
-    }
-}
-
 
 /* 
  * Return q_id on success and exit on failure.

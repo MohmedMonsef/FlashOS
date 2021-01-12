@@ -6,6 +6,7 @@
 #include <sys/msg.h>
 #include <sys/wait.h>
 #include <sys/types.h>
+#include <unistd.h>
 #include<errno.h>
 union Semun
 {
