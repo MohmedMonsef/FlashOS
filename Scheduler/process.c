@@ -41,8 +41,9 @@ int main(int agrc, char *argv[])
     prevClk = getClk();
     while (remaining_time > 0)
     {
+
         nxtClk = getClk();
-        if (nxtClk != prevClk)
+        if (nxtClk == prevClk + 1)
         {
             remaining_time--;
             *sched_shmaddr = remaining_time;
@@ -56,6 +57,9 @@ int main(int agrc, char *argv[])
             printf("___Remaining time = %i\n", remaining_time);
             prevClk = nxtClk;
         }
+        else if(nxtClk > prevClk)
+            prevClk = nxtClk;
+            
     }
 
     clearResources(0);
