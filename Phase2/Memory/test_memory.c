@@ -1,4 +1,4 @@
-#include "./memory.h"
+#include "../Scheduler/headers.h"
 struct Process process[5] = {{1, 3, 29, 8, 10},
                              {2, 3, 29, 8, 8},
                              {3, 13, 8, 9, 100},

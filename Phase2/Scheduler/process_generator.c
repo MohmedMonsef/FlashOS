@@ -80,16 +80,17 @@ int main(int argc, char *argv[])
 		}
 	}
 	// 5. Create a data structure for processes and provide it with its parameters.
-	n = (i - 1) / 4;
+	n = (i - 1) / 5;
 	struct Process Processes[n];
 	int index = 0;
-	for (int j = 0; j < i - 1; j += 4)
+	for (int j = 0; j < i - 1; j += 5)
 	{
 		struct Process P;
 		P.id = Array[j];
 		P.arrival = Array[j + 1];
 		P.runtime = Array[j + 2];
 		P.priority = Array[j + 3];
+		P.memSize = Array[j + 4];
 		Processes[index] = P;
 		index++;
 	}
@@ -123,7 +124,7 @@ int main(int argc, char *argv[])
 	else if (pid1 == 0)
 	{
 		// schedular
-		char *pcbSize;
+		char *pcbSize = (char *)malloc(10 * sizeof(char *));
 		sprintf(pcbSize, "%d", n);
 		char *a[] = {Algo, pcbSize, Parameter, NULL};
 		execv("./scheduler.out", a);
@@ -157,7 +158,7 @@ int main(int argc, char *argv[])
 					// 6. Send the information to the scheduler at the appropriate time.
 					printf("%d : %d\n", x, Processes[index].id); //instead send
 					struct ProcessBuff *newProcess = (struct ProcessBuff *)malloc(sizeof(struct ProcessBuff));
-					struct Process p = {Processes[index].id - 1, Processes[index].arrival, Processes[index].runtime, Processes[index].priority};
+					struct Process p = {Processes[index].id - 1, Processes[index].arrival, Processes[index].runtime, Processes[index].priority, Processes[index].memSize};
 					newProcess->header = 1;
 					newProcess->content = p;
 					if (sendProcess(newProcess, gen_q_id) != -1)
