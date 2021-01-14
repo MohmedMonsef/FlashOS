@@ -15,3 +15,13 @@ int log2_int(int x)
     }
     return power;
 }
+int pow2(int x)
+{
+
+    int res = 1;
+    while (x--)
+    {
+        res = res * 2;
+    }
+    return res;
+}

@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include "./utilities.h"
-#include "../Structs/structs.h"
 
 struct Memory memory;
 bool isMemoryCreated = false;
@@ -278,6 +277,21 @@ void deleteFromMemory(struct Process process)
     struct Block *mergedCells[2] = {NULL, NULL};
     struct Block **mergedCellsAddress = freeSpaceMemory(indexInMem, process.id, mergedCells);
     mergeCells(indexInMem, mergedCellsAddress);
+}
+
+bool checkIfProcessFitInMemory(int processSize)
+{
+    int i = 9;
+    while (i >= 0 && memory.memory[i].freeCount == 0)
+    {
+        i--;
+    }
+    if (i == -1)
+    {
+        return false;
+    }
+    int indexInMem = log2_int(processSize) - 1;
+    return i >= indexInMem;
 }
 
 void displayMemory()

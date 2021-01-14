@@ -1,0 +1,7 @@
+At time  2  process  0 arrived  arr  2  total  4  remain  4  wait  0
+At time  2  process  1 arrived  arr  2  total  3  remain  3  wait  0
+At time  2  process  2 arrived  arr  2  total  3  remain  3  wait  0
+At time  2  process  1 started  arr  2  total  3  remain  3  wait  0
+At time  3  process  3 arrived  arr  3  total  1  remain  1  wait  0
+At time  3  process  4 arrived  arr  3  total  2  remain  2  wait  0
+At time  3  process  1 stopped  arr  2  total  3  remain  2  wait  0
