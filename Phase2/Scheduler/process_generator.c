@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
 	int pid1, pid2, algo = 0;
 	char *Parameter, *Algo;
 	Algo = (char *)malloc(1 * sizeof(char *));
-	Parameter = (char *)malloc(1 * sizeof(char *));
+	Parameter = (char *)malloc(10 * sizeof(char *));
 	printf("What is the Scheduling Algorthim you want to work with\n");
 	printf("Enter:\n");
 	printf("1 for Non-Peremative Priority\n");
@@ -123,7 +123,6 @@ int main(int argc, char *argv[])
 		perror("error in fork");
 	else if (pid1 == 0)
 	{
-		printf("HELLOOOOOOOOOOOOOOOO\n");
 		// schedular
 		char *pcbSize = (char *)malloc(10 * sizeof(char *));
 		sprintf(pcbSize, "%d", n);

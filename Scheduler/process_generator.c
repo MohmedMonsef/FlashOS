@@ -3,11 +3,11 @@
 /* arg for semctl system calls. */
 union Semun
 {
-    int val;               /* value for SETVAL */
-    struct semid_ds *buf;  /* buffer for IPC_STAT & IPC_SET */
-    ushort *array;         /* array for GETALL & SETALL */
-    struct seminfo *__buf; /* buffer for IPC_INFO */
-    void *__pad;
+	int val;			   /* value for SETVAL */
+	struct semid_ds *buf;  /* buffer for IPC_STAT & IPC_SET */
+	ushort *array;		   /* array for GETALL & SETALL */
+	struct seminfo *__buf; /* buffer for IPC_INFO */
+	void *__pad;
 };
 
 void clearResources(int signum);
@@ -96,6 +96,8 @@ int main(int argc, char *argv[])
 	// 2. Ask the user for the chosen scheduling algorithm and its parameters, if there are any.(done)
 	int pid1, pid2, algo = 0;
 	char *Parameter, *Algo;
+	Algo = (char *)malloc(1 * sizeof(char *));
+	Parameter = (char *)malloc(10 * sizeof(char *));
 	printf("What is the Scheduling Algorthim you want to work with\n");
 	printf("Enter:\n");
 	printf("1 for Non-Peremative Priority\n");
@@ -144,8 +146,8 @@ int main(int argc, char *argv[])
 			// 4. Use this function after creating the clock process to initialize clock
 			initClk();
 			// TODO Generation Main Loop
-			int x, prev_time = -1 ;
-			bool allowed_up=false;
+			int x, prev_time = -1;
+			bool allowed_up = false;
 			while (index < n)
 			{
 				// To get time use this
@@ -162,13 +164,12 @@ int main(int argc, char *argv[])
 						index++;
 					allowed_up = true;
 				}
-				if(allowed_up || x > prev_time)
+				if (allowed_up || x > prev_time)
 				{
 					up();
 					allowed_up = false;
 					prev_time = x;
 				}
-				
 			}
 			//When all proceeses are sent, don't make the scheduler wait for you:
 			kill(pid1, SIGUSR1);
@@ -211,59 +212,58 @@ int sendProcess(struct ProcessBuff *message, int q_id)
 	else
 		//printf("sent from Generator\n");
 
-	return status;
+		return status;
 }
 
 void createSem(int key, union Semun *sem)
 {
-    //1. Create Sems:
-    gen_sem_id = semget(key, 1, 0666 | IPC_CREAT);
+	//1. Create Sems:
+	gen_sem_id = semget(key, 1, 0666 | IPC_CREAT);
 
-    if (gen_sem_id == -1)
-    {
-        perror("Error in create the semaphor at scheduler:(\n");
-        exit(-1);
-    }
+	if (gen_sem_id == -1)
+	{
+		perror("Error in create the semaphor at scheduler:(\n");
+		exit(-1);
+	}
 
-    sem->val = 0; /* initial value of the semaphore, Binary semaphore */
-    if (semctl(gen_sem_id, 0, SETVAL, *sem) == -1)
-    {
-        perror("Error in semctl: set value\n");
-        exit(-1);
-    }
+	sem->val = 0; /* initial value of the semaphore, Binary semaphore */
+	if (semctl(gen_sem_id, 0, SETVAL, *sem) == -1)
+	{
+		perror("Error in semctl: set value\n");
+		exit(-1);
+	}
 }
 
 void down()
 {
-    struct sembuf p_op;
+	struct sembuf p_op;
 
-    p_op.sem_num = 0;
-    p_op.sem_op = -1;
-    p_op.sem_flg = !IPC_NOWAIT;
+	p_op.sem_num = 0;
+	p_op.sem_op = -1;
+	p_op.sem_flg = !IPC_NOWAIT;
 
-    if (semop(gen_sem_id, &p_op, 1) == -1)
-    {
-        perror("Error in down() at Process:(\n");
-        exit(-1);
-    }
+	if (semop(gen_sem_id, &p_op, 1) == -1)
+	{
+		perror("Error in down() at Process:(\n");
+		exit(-1);
+	}
 }
 
 void up()
 {
-    struct sembuf v_op;
+	struct sembuf v_op;
 
-    v_op.sem_num = 0;
-    v_op.sem_op = 1;
-    v_op.sem_flg = !IPC_NOWAIT;
+	v_op.sem_num = 0;
+	v_op.sem_op = 1;
+	v_op.sem_flg = !IPC_NOWAIT;
 
-    if (semop(gen_sem_id, &v_op, 1) == -1)
-    {
-        perror("Error in up() at Process:(\n");
-        exit(-1);
-    }
+	if (semop(gen_sem_id, &v_op, 1) == -1)
+	{
+		perror("Error in up() at Process:(\n");
+		exit(-1);
+	}
 	printf("up generator\n");
 }
-
 
 /*
  * Clear all resources(Generator Q, Clk, Terminate all)
