@@ -94,13 +94,6 @@ void createSem(int key, union Semun *sem)
         perror("Error in create the semaphor at scheduler:(\n");
         exit(-1);
     }
-
-    sem->val = 0; /* initial value of the semaphore, Binary semaphore */
-    if (semctl(sem_id, 0, SETVAL, *sem) == -1)
-    {
-        perror("Error in semctl: set value\n");
-        exit(-1);
-    }
 }
 
 void down()

@@ -11,6 +11,7 @@ union Semun
 };
 
 void clearResources(int signum);
+void handleSchedulerWake(int signum);
 int createQueue(int key);
 int sendProcess(struct ProcessBuff *message, int q_id);
 
@@ -19,10 +20,12 @@ void up();
 void down();
 
 int gen_q_id, gen_sem_id;
+bool go = false;
 
 int main(int argc, char *argv[])
 {
 	signal(SIGINT, clearResources);
+	signal(SIGUSR1, handleSchedulerWake);
 	gen_q_id = createQueue(GENERATOR_Q_KEY);
 	struct ProcessBuff message;
 	message.header = 1;
@@ -146,16 +149,17 @@ int main(int argc, char *argv[])
 			// 4. Use this function after creating the clock process to initialize clock
 			initClk();
 			// TODO Generation Main Loop
-			int x, prev_time = -1;
+			int current_time, prev_time = -1, last_time = Processes[n-1].arrival;
 			bool allowed_up = false;
+			while(!go);// Wait the scheduler
 			while (index < n)
 			{
 				// To get time use this
-				x = getClk();
-				while (x >= Processes[index].arrival && index < n)
+				current_time = getClk();
+				while (current_time >= Processes[index].arrival && index < n)
 				{
 					// 6. Send the information to the scheduler at the appropriate time.
-					printf("%d : %d\n", x, Processes[index].id); //instead send
+					printf("%d : %d\n", current_time, Processes[index].id); //instead send
 					struct ProcessBuff *newProcess = (struct ProcessBuff *)malloc(sizeof(struct ProcessBuff));
 					struct Process p = {Processes[index].id - 1, Processes[index].arrival, Processes[index].runtime, Processes[index].priority};
 					newProcess->header = 1;
@@ -164,11 +168,11 @@ int main(int argc, char *argv[])
 						index++;
 					allowed_up = true;
 				}
-				if (allowed_up || x > prev_time)
+				if ((allowed_up || current_time > prev_time) && (current_time < last_time))
 				{
 					up();
 					allowed_up = false;
-					prev_time = x;
+					prev_time = current_time;
 				}
 			}
 			//When all proceeses are sent, don't make the scheduler wait for you:
@@ -209,10 +213,8 @@ int sendProcess(struct ProcessBuff *message, int q_id)
 	int status = msgsnd(q_id, message, sizeof(message->content), !IPC_NOWAIT);
 	if (status == -1)
 		printf("Failed to send the process @ Generator:(\n");
-	else
-		//printf("sent from Generator\n");
 
-		return status;
+	return status;
 }
 
 void createSem(int key, union Semun *sem)
@@ -247,6 +249,7 @@ void down()
 		perror("Error in down() at Process:(\n");
 		exit(-1);
 	}
+	printf("Wait Scheduler to wake\n");
 }
 
 void up()
@@ -263,6 +266,11 @@ void up()
 		exit(-1);
 	}
 	printf("up generator\n");
+}
+
+void handleSchedulerWake(int signum)
+{
+	go = true;
 }
 
 /*

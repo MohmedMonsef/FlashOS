@@ -33,7 +33,7 @@ void insertPCB(struct Process newProccess, int pid);
 int runProcess(struct Process *curProccess);
 void contextSwitching_STN();
 
-int gen_q_id, shm_id, sem_id, curProcessId, gen_sem_id;
+int gen_q_id, shm_id, sched_sem_id, curProcessId, gen_sem_id;
 int *sched_shmaddr;
 int schedulerType, processCount;
 bool processRunning = false, waitGen = true;
@@ -42,6 +42,7 @@ struct PCB *pcb;
 FILE *fLog;
 struct ProcessBuff *receivedProcess;
 union Semun semun;
+bool interrupt_from_generator = false, interrupt_from_process = false;
 
 int main(int argc, char *argv[])
 {
@@ -55,7 +56,7 @@ int main(int argc, char *argv[])
     gen_q_id = createQueue(GENERATOR_Q_KEY);
 
     shm_id = createShmem(SCHEDULER_SHM_KEY);
-    sem_id = createSem(SCHED_SEM_KEY, &semun);
+    sched_sem_id = createSem(SCHED_SEM_KEY, &semun);
     union Semun gen_semun;
     gen_sem_id = createSem(GEN_SEM_KEY, &gen_semun);
 
@@ -70,6 +71,7 @@ int main(int argc, char *argv[])
     receivedProcess = (struct ProcessBuff *)malloc(sizeof(struct ProcessBuff));
     receivedProcess->header = 1;
     fLog = fopen("scheduler.log", "w");
+    kill(getppid(), SIGUSR1);
     while (processCount)
     {
 
@@ -87,7 +89,7 @@ int main(int argc, char *argv[])
             if (processRunning)
             {
                 printf("Try down process\n");
-                down(sem_id);
+                down(sched_sem_id);
             }
             STN();
         }
@@ -146,6 +148,10 @@ void handleChildExit(int signum)
     processRunning = false;
     //p_op.sem_flg = (IPC_NOWAIT);
     processCount--;
+    interrupt_from_process = true;
+    up(sched_sem_id);
+    if(processCount < 1)
+        clearResources(0);
 }
 
 int createShmem(int key)
@@ -182,11 +188,14 @@ int createSem(int key, union Semun *sem)
         exit(-1);
     }
 
-    sem->val = 0; /* initial value of the semaphore, Binary semaphore */
-    if (semctl(sem_id, 0, SETVAL, *sem) == -1)
+    if(key != GEN_SEM_KEY)
     {
-        perror("Error in semctl: set value\n");
-        exit(-1);
+        sem->val = 0; /* initial value of the semaphore, Binary semaphore */
+        if (semctl(sem_id, 0, SETVAL, *sem) == -1)
+        {
+            perror("Error in semctl: set value\n");
+            exit(-1);
+        }
     }
     return sem_id;
 }
@@ -210,11 +219,18 @@ void down(int sem_id)
 
             exit(-1);
         }
+        else
+        {
+            printf("Interrupted in down\n");
+            down(sem_id);
+        }
+            
     }
     if (sem_id == gen_sem_id)
         printf("down generator\n");
     else
         printf("Down process\n");
+    
 }
 
 void up(int sem_id)
@@ -230,7 +246,7 @@ void up(int sem_id)
         perror("Error in up() at Scheduler:(\n");
         exit(-1);
     }
-    printf("Up scheduler");
+    printf("Up scheduler\n");
 }
 
 int getRemainingTime()
@@ -247,7 +263,7 @@ int getRemainingTime()
     return -1;
 */
     printf("B READ\n");
-    down(sem_id);
+    down(sched_sem_id);
     int rem = *sched_shmaddr;
     //up();
     printf("Getting rem time at Scheduler\n");
@@ -262,7 +278,7 @@ int getRemainingTime()
 void clearResources(int signum)
 {
     printf("Clear Resources @ Scheduler\n");
-    semctl(sem_id, 0, IPC_RMID, (struct semid_ds *)0);
+    semctl(sched_sem_id, 0, IPC_RMID, (struct semid_ds *)0);
     semctl(gen_sem_id, 0, IPC_RMID, (struct semid_ds *)0);
     shmctl(shm_id, IPC_RMID, (struct shmid_ds *)0);
     destroyClk(true);
@@ -444,6 +460,8 @@ int runProcess(struct Process *curProccess)
 
 void handleGenFinish(int signum)
 {
+    interrupt_from_generator = true;
+    up(gen_sem_id);
     waitGen = false;
     printf("wait Gen = false.\n");
 }
