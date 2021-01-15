@@ -33,7 +33,7 @@ void insertPCB(struct Process newProccess, int pid);
 int runProcess(struct Process *curProccess);
 void contextSwitching_STN();
 
-int gen_q_id, shm_id, sem_id, curProcessId, gen_sem_id;
+int gen_q_id, shm_id, sched_sem_id, curProcessId, gen_sem_id;
 int *sched_shmaddr;
 int schedulerType, processCount;
 bool processRunning = false, waitGen = true;
@@ -42,11 +42,10 @@ struct PCB *pcb;
 FILE *fLog;
 struct ProcessBuff *receivedProcess;
 union Semun semun;
+bool interrupt_from_generator = false, interrupt_from_process = false;
 
 int main(int argc, char *argv[])
 {
-    printf("count type \n ");
-
     key_t key_id;
     initClk();
     signal(SIGINT, clearResources);
@@ -57,7 +56,7 @@ int main(int argc, char *argv[])
     gen_q_id = createQueue(GENERATOR_Q_KEY);
 
     shm_id = createShmem(SCHEDULER_SHM_KEY);
-    sem_id = createSem(SCHED_SEM_KEY, &semun);
+    sched_sem_id = createSem(SCHED_SEM_KEY, &semun);
     union Semun gen_semun;
     gen_sem_id = createSem(GEN_SEM_KEY, &gen_semun);
 
@@ -71,9 +70,12 @@ int main(int argc, char *argv[])
     }
     receivedProcess = (struct ProcessBuff *)malloc(sizeof(struct ProcessBuff));
     receivedProcess->header = 1;
+    openMemoryLogFile();
     fLog = fopen("scheduler.log", "w");
+    kill(getppid(), SIGUSR1);
     while (processCount)
     {
+
         if (schedulerType == 1)
         {
             HPF();
@@ -82,20 +84,17 @@ int main(int argc, char *argv[])
         {
             if (waitGen)
             {
-                printf("Try down gen\n");
                 down(gen_sem_id);
             }
             if (processRunning)
             {
-                printf("Try down process\n");
-                down(sem_id);
+                down(sched_sem_id);
             }
-
             STN();
         }
     }
+    closeMemoryLogFile();
     fclose(fLog);
-    //upon termination release the clock resources.
     clearResources(0);
 }
 
@@ -127,7 +126,6 @@ int createQueue(int key)
 */
 int receiveProcess(struct ProcessBuff *message)
 {
-    //printf("Scheduler is Receiving a process\n");
     int x = msgrcv(gen_q_id, message, sizeof(message->content), ALL, IPC_NOWAIT);
     if (x != -1)
     {
@@ -142,13 +140,15 @@ int receiveProcess(struct ProcessBuff *message)
 */
 void handleChildExit(int signum)
 {
-    printf("Parent is notified of child exit.\n");
     pcb[curProcessId].process.runtime = 0;
     logProcess(curProcessId, "finished", getClk());
-    deleteFromMemory(pcb[curProcessId].process);
     processRunning = false;
-    //p_op.sem_flg = (IPC_NOWAIT);
     processCount--;
+    interrupt_from_process = true;
+    deleteFromMemory(pcb[curProcessId].process, getClk());
+    up(sched_sem_id);
+    if (processCount < 1)
+        clearResources(0);
 }
 
 int createShmem(int key)
@@ -185,11 +185,14 @@ int createSem(int key, union Semun *sem)
         exit(-1);
     }
 
-    sem->val = 0; /* initial value of the semaphore, Binary semaphore */
-    if (semctl(sem_id, 0, SETVAL, *sem) == -1)
+    if (key != GEN_SEM_KEY)
     {
-        perror("Error in semctl: set value\n");
-        exit(-1);
+        sem->val = 0; /* initial value of the semaphore, Binary semaphore */
+        if (semctl(sem_id, 0, SETVAL, *sem) == -1)
+        {
+            perror("Error in semctl: set value\n");
+            exit(-1);
+        }
     }
     return sem_id;
 }
@@ -213,11 +216,12 @@ void down(int sem_id)
 
             exit(-1);
         }
+        else
+        {
+            printf("Interrupted in down\n");
+            down(sem_id);
+        }
     }
-    if (sem_id == gen_sem_id)
-        printf("down generator\n");
-    else
-        printf("Down process\n");
 }
 
 void up(int sem_id)
@@ -233,16 +237,12 @@ void up(int sem_id)
         perror("Error in up() at Scheduler:(\n");
         exit(-1);
     }
-    printf("Up scheduler");
 }
 
 int getRemainingTime()
 {
-    printf("B READ\n");
-    down(sem_id);
+    down(sched_sem_id);
     int rem = *sched_shmaddr;
-    //up();
-    printf("Getting rem time at Scheduler\n");
     return rem;
 }
 
@@ -254,7 +254,7 @@ int getRemainingTime()
 void clearResources(int signum)
 {
     printf("Clear Resources @ Scheduler\n");
-    semctl(sem_id, 0, IPC_RMID, (struct semid_ds *)0);
+    semctl(sched_sem_id, 0, IPC_RMID, (struct semid_ds *)0);
     semctl(gen_sem_id, 0, IPC_RMID, (struct semid_ds *)0);
     shmctl(shm_id, IPC_RMID, (struct shmid_ds *)0);
     destroyClk(true);
@@ -298,7 +298,6 @@ void logProcess(int id, char *status, int clk)
     sprintf(params[4], "%d", pcb[id].totalRunTime);
     sprintf(params[5], "%d", pcb[id].process.runtime);
     sprintf(params[6], "%d", pcb[id].wait);
-    printf("log id= %d , w= %d \n", id, pcb[id].wait);
     if (finished == 0)
     {
         int TA = clk - pcb[id].process.arrival;
@@ -315,14 +314,19 @@ void HPF()
     int rsv_value = receiveProcess(receivedProcess);
     while (rsv_value != -1)
     {
-        printf("Received id = %i\n", receivedProcess->content.id + 1);
         logProcess(receivedProcess->content.id, "arrived", getClk());
         pushProcess(receivedProcess->content);
         rsv_value = receiveProcess(receivedProcess);
     }
-    if (!processRunning)
+    struct Process *receivedProcessSize = getFrontProcess();
+    bool isProcessFitInMemory = true;
+    if (receivedProcessSize)
     {
-        struct Process *curProccess = getFrontProcess();
+        isProcessFitInMemory = checkIfProcessFitInMemory(receivedProcessSize->memSize);
+    }
+    if (!processRunning && isProcessFitInMemory)
+    {
+        struct Process *curProccess = popProcess();
         if (curProccess)
         {
             int pid = runProcess(curProccess);
@@ -336,25 +340,28 @@ void HPF()
 
 void STN()
 {
-    printf("Enter STN\n");
     int rsv_value = receiveProcess(receivedProcess);
     bool received = false;
     while (rsv_value != -1)
     {
         received = true;
-        printf("Received id = %i\n", receivedProcess->content.id + 1);
         logProcess(receivedProcess->content.id, "arrived", getClk());
         pushProcess(receivedProcess->content);
         rsv_value = receiveProcess(receivedProcess);
     }
-    if (processRunning && received) //&& (*sched_shmaddr > 1))
+    struct Process *receivedProcessSize = getFrontProcess();
+    bool isProcessFitInMemory = true;
+    if (receivedProcessSize)
+    {
+        isProcessFitInMemory = checkIfProcessFitInMemory(receivedProcessSize->memSize);
+    }
+    if (processRunning && received && isProcessFitInMemory) //&& (*sched_shmaddr > 1))
     {
         contextSwitching_STN();
     }
-    if (!processRunning)
+    if (!processRunning && isProcessFitInMemory)
     {
-        printf("Enter Process not running so add new one.\n");
-        struct Process *curProccess = getFrontProcess();
+        struct Process *curProccess = popProcess();
         if (curProccess)
         {
 
@@ -368,14 +375,11 @@ void STN()
 
 void contextSwitching_STN()
 {
-    printf("Enter context switching\n");
     int curRemaining = *sched_shmaddr;
-    printf("curRemaining %d\n", curRemaining);
     struct Process *process = getFrontProcess();
 
     if (curRemaining > process->runtime)
     {
-        printf("Switch\n");
         kill(pcb[curProcessId].pid, SIGUSR1);
         process = popProcess();
         pcb[curProcessId].lastStopped = getClk();
@@ -392,43 +396,36 @@ int runProcess(struct Process *curProccess)
 
     if (pcb[curProccess->id].pid != -1)
     {
-        popProcess();
         pid = pcb[curProccess->id].pid;
         pcb[curProccess->id].wait += (getClk() - pcb[curProcessId].lastStopped);
-        printf("resumed time %d\n", pcb[curProccess->id].process.runtime);
         logProcess(curProccess->id, "resumed", getClk());
         kill(pid, SIGCONT);
     }
     else
     {
-        if (checkIfProcessFitInMemory(curProccess->memSize))
+        pid = fork();
+        if (pid == -1)
+            perror("error in fork");
+        else if (pid == 0)
         {
-            popProcess();
-            pid = fork();
-            if (pid == -1)
-                perror("error in fork");
-            else if (pid == 0)
-            {
-                char runtime[50];
-                sprintf(runtime, "%d", curProccess->runtime);
-                char *arg[] = {runtime, NULL};
-                execv("./process.out", arg);
-            }
-            else
-            {
-                insertInMemory(*curProccess);
-                printf("cur wait id = %d  w= %d ls = %d\n", curProccess->id, pcb[curProccess->id].wait, pcb[curProccess->id].lastStopped);
-                pcb[curProccess->id].wait = (getClk() - pcb[curProccess->id].lastStopped);
-                logProcess(curProccess->id, "started", getClk());
-            }
+            char runtime[50];
+            sprintf(runtime, "%d", curProccess->runtime);
+            char *arg[] = {runtime, NULL};
+            execv("./process.out", arg);
+        }
+        else
+        {
+            insertInMemory(pcb[curProccess->id].process, getClk());
+            pcb[curProccess->id].wait = (getClk() - pcb[curProccess->id].lastStopped);
+            logProcess(curProccess->id, "started", getClk());
         }
     }
-    printf("New Process entered, id = %i\n", curProccess->id + 1);
     return pid;
 }
 
 void handleGenFinish(int signum)
 {
+    interrupt_from_generator = true;
+    up(gen_sem_id);
     waitGen = false;
-    printf("wait Gen = false.\n");
 }

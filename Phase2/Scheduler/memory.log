@@ -1,0 +1,4 @@
+At time  1   Allocated 500 Bytes For Process 1 from 0  to  511
+At time  7   Deallocated 500 Bytes For Process 1 from 0  to  511
+At time  7   Allocated 600 Bytes For Process 2 from 0  to  1023
+At time  10   Deallocated 600 Bytes For Process 2 from 0  to  1023

@@ -27,8 +27,6 @@ int prevClk, nxtClk;
 int globalRemaining;
 int main(int agrc, char *argv[])
 {
-    printf("New process forked\n");
-    //kill(getppid(), SIGCONT);
     initClk();
     signal(SIGUSR1, stopHandler);
     signal(SIGINT, clearResources);
@@ -41,8 +39,9 @@ int main(int agrc, char *argv[])
     prevClk = getClk();
     while (remaining_time > 0)
     {
+
         nxtClk = getClk();
-        if (nxtClk != prevClk)
+        if (nxtClk == prevClk + 1)
         {
             remaining_time--;
             *sched_shmaddr = remaining_time;
@@ -53,9 +52,10 @@ int main(int agrc, char *argv[])
                 up();
             }
 
-            printf("___Remaining time = %i\n", remaining_time);
             prevClk = nxtClk;
         }
+        else if (nxtClk > prevClk)
+            prevClk = nxtClk;
     }
 
     clearResources(0);
@@ -70,8 +70,6 @@ int attachShm(int key)
         perror("Error in creating the shared memory @ Process:(\n");
         exit(-1);
     }
-    // else
-    //     printf("\nShared memory ID = %d\n", shmid);
 
     sched_shmaddr = (int *)shmat(shmid, (void *)0, 0);
     if (*sched_shmaddr == -1)
@@ -79,8 +77,6 @@ int attachShm(int key)
         perror("Error in attach in Process:(\n");
         exit(-1);
     }
-    // else
-    //     printf("Process: Shared memory attached at address %ls\n", shmaddr);
     return shm_id;
 }
 
@@ -92,13 +88,6 @@ void createSem(int key, union Semun *sem)
     if (sem_id == -1)
     {
         perror("Error in create the semaphor at scheduler:(\n");
-        exit(-1);
-    }
-
-    sem->val = 0; /* initial value of the semaphore, Binary semaphore */
-    if (semctl(sem_id, 0, SETVAL, *sem) == -1)
-    {
-        perror("Error in semctl: set value\n");
         exit(-1);
     }
 }
@@ -131,12 +120,10 @@ void up()
         perror("Error in up() at Process:(\n");
         exit(-1);
     }
-    printf("up process\n");
 }
 
 void sendRemainingTime()
 {
-    printf("Sending remaining time to Schedular\n");
     *sched_shmaddr = remaining_time;
     up();
 }
@@ -147,8 +134,6 @@ void sendRemainingTime()
 */
 void stopHandler(int signum)
 {
-    //sendRemainingTime();
-    //ToBeFixed : Remaining Time That The scheduler reads in real needs to be sent in SIGCONT
     remaining_time = globalRemaining;
     printf("Process go to sleep\n");
     raise(SIGSTOP);
@@ -170,10 +155,8 @@ void contHandler(int signum)
 */
 void clearResources(int signum)
 {
-    printf("Current process is exiting\n");
     shmdt(sched_shmaddr);
     destroyClk(false);
     kill(getppid(), SIGUSR2);
-    printf("Notified Parent and exiting..\n");
     exit(0);
 }
