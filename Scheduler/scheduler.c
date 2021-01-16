@@ -9,13 +9,13 @@ union Semun
     struct seminfo *__buf; /* buffer for IPC_INFO */
     void *__pad;
 };
-
+void schedulerPerformance();
 int createQueue(int key);
 int receiveProcess(struct ProcessBuff *message);
 
 int createShmem(int key);
 int createSem(int key, union Semun *sem);
-void up(int sem_id); 
+void up(int sem_id);
 void down(int sem_id);
 int getRemainingTime();
 
@@ -34,18 +34,22 @@ int runProcess(struct Process *curProccess);
 void contextSwitching_STN();
 void contextSwitching_RR();
 
-int gen_q_id, shm_id, sched_sem_id, curProcessId, gen_sem_id, quantum, counter = 0, prev_time=-1;
+int gen_q_id, shm_id, sched_sem_id, curProcessId, gen_sem_id, quantum, counter = 0, prev_time = -1;
 int *sched_shmaddr;
 int schedulerType, processCount;
 bool processRunning = false, waitGen = true;
 struct sembuf p_op;
 struct PCB *pcb;
 FILE *fLog;
+FILE *perfLog;
 struct ProcessBuff *receivedProcess;
 union Semun semun;
 bool interrupt_from_generator = false, interrupt_from_process = false;
-struct CircularQueue*Q;
-
+struct CircularQueue *Q;
+int totalTimeForProcessesRunning = 0;
+double TotalWTA = 0;
+double totalWaiting = 0;
+int AllProcesses = 0;
 int main(int argc, char *argv[])
 {
     key_t key_id;
@@ -63,7 +67,7 @@ int main(int argc, char *argv[])
     gen_sem_id = createSem(GEN_SEM_KEY, &gen_semun);
 
     schedulerType = atoi(argv[0]);
-    if(schedulerType == 3)
+    if (schedulerType == 3)
     {
         quantum = atoi(argv[2]);
         Q = initiate(Q);
@@ -72,8 +76,9 @@ int main(int argc, char *argv[])
     {
         createPriorityQueue(2 - schedulerType);
     }
-        
+
     processCount = atoi(argv[1]);
+    AllProcesses = processCount;
     pcb = (struct PCB *)malloc(processCount * sizeof(struct PCB));
 
     receivedProcess = (struct ProcessBuff *)malloc(sizeof(struct ProcessBuff));
@@ -103,15 +108,16 @@ int main(int argc, char *argv[])
         }
         else if (schedulerType == 3)
         {
-            while(getClk() - prev_time < 1)
+            while (getClk() - prev_time < 1)
                 ;
-            printf("processes: %d\n",processCount);
+            printf("processes: %d\n", processCount);
             RR();
             prev_time = getClk();
         }
-        printf("processes: %d\n",processCount);
+        printf("processes: %d\n", processCount);
     }
     fclose(fLog);
+    schedulerPerformance();
     //upon termination release the clock resources.
     clearResources(0);
 }
@@ -159,10 +165,9 @@ int receiveProcess(struct ProcessBuff *message)
 void handleChildExit(int signum)
 {
     printf("Parent is notified of child exit.\n");
-    if(schedulerType == 3)
+    if (schedulerType == 3)
     {
         CircularQueueDeleteFirst(Q);
-        PrintCircularQueue(Q);
     }
     pcb[curProcessId].process.runtime = 0;
     logProcess(curProcessId, "finished", getClk());
@@ -171,7 +176,10 @@ void handleChildExit(int signum)
     interrupt_from_process = true;
     up(sched_sem_id);
     if (processCount < 1)
+    {
+        schedulerPerformance();
         clearResources(0);
+    }
 }
 
 int createShmem(int key)
@@ -242,7 +250,7 @@ void down(int sem_id)
         else
         {
             printf("Interrupted in down\n");
-            if(sem_id == gen_sem_id && interrupt_from_process)
+            if (sem_id == gen_sem_id && interrupt_from_process)
                 down(sched_sem_id);
             interrupt_from_process = false;
             down(sem_id);
@@ -270,7 +278,6 @@ void up(int sem_id)
     printf("Up scheduler\n");
 }
 
-
 /*
  * Remove "Schedular Q"
  * Destroy clk
@@ -294,12 +301,13 @@ void insertPCB(struct Process newProccess, int pid)
     pcb[id].pid = pid;
     pcb[id].totalRunTime = newProccess.runtime;
     pcb[id].lastStopped = newProccess.arrival;
+    totalTimeForProcessesRunning += pcb[id].totalRunTime;
 }
 
 //writing in files
 void writeInFile(char **params, int size)
 {
-    char *firstStrings[9] = {"At time  ", "  process  ", " ", "  arr  ", "  total  ", "  remain  ", "  wait  ", " ta ", "  wta  "};
+    char *firstStrings[9] = {"At time ", " process ", " ", " arr ", " total ", " remain ", " wait ", " TA ", " WTA "};
     char *strOut = (char *)malloc(500);
     for (int i = 0; i < size; i++)
     {
@@ -313,7 +321,6 @@ void writeInFile(char **params, int size)
 
 void logProcess(int id, char *status, int clk)
 {
-    id += 1;
     bool finished = strcmp(status, "finished");
     int size = finished == 0 ? 9 : 7;
     char *params[9];
@@ -322,21 +329,24 @@ void logProcess(int id, char *status, int clk)
         params[i] = (char *)malloc(50 * sizeof(char));
     }
     sprintf(params[0], "%d", clk);
-    sprintf(params[1], "%d", id);
+    sprintf(params[1], "%d", id + 1);
     params[2] = status;
     sprintf(params[3], "%d", pcb[id].process.arrival);
     sprintf(params[4], "%d", pcb[id].totalRunTime);
     sprintf(params[5], "%d", pcb[id].process.runtime);
     sprintf(params[6], "%d", pcb[id].wait);
-    printf("log id= %d , w= %d \n", id, pcb[id].wait);
     if (finished == 0)
     {
         int TA = clk - pcb[id].process.arrival;
         float WTA = (pcb[id].totalRunTime != 0) ? (float)TA / pcb[id].totalRunTime : 0;
         WTA = (int)(WTA * 100 + .5);
         WTA = (float)WTA / 100;
+        WTA = floor(100 * WTA) / 100;
+        pcb[id].WTA = WTA;
+        TotalWTA += WTA;
+        totalWaiting += pcb[id].wait;
         sprintf(params[7], "%d", TA);
-        sprintf(params[8], "%f", WTA);
+        sprintf(params[8], "%g", WTA);
     }
     writeInFile(params, size);
 }
@@ -375,7 +385,7 @@ void STN()
         pushProcess(receivedProcess->content);
         rsv_value = receiveProcess(receivedProcess);
     }
-    if (processRunning && received) 
+    if (processRunning && received)
     {
         contextSwitching_STN();
     }
@@ -406,7 +416,7 @@ void contextSwitching_STN()
         printf("Switch\n");
 
         kill(pcb[curProcessId].pid, SIGSTOP);
-        
+
         process = popProcess();
         pcb[curProcessId].lastStopped = getClk();
         pcb[curProcessId].process.runtime = curRemaining;
@@ -415,7 +425,6 @@ void contextSwitching_STN()
         curProcessId = process->id;
         runProcess(process);
     }
-    
 }
 int runProcess(struct Process *curProccess)
 {
@@ -455,7 +464,6 @@ int runProcess(struct Process *curProccess)
     return pid;
 }
 
-
 void RR()
 {
     printf("Enter RR\n");
@@ -465,16 +473,14 @@ void RR()
     while (rsv_value != -1)
     {
         received = true;
-        printf("############Received id = %i\n", receivedProcess->content.id + 1);
-        logProcess(receivedProcess->content.id, "arrived", getClk());
-        CircularQueueInsert(Q,receivedProcess->content);
+        CircularQueueInsert(Q, receivedProcess->content);
         rsv_value = receiveProcess(receivedProcess);
     }
     if (counter % quantum == 0 && processRunning && *shmaddr != 0)
     {
         contextSwitching_RR();
         counter = 0;
-    }   
+    }
     if (!processRunning)
     {
         printf("Enter Process not running so add new one.\n");
@@ -488,27 +494,26 @@ void RR()
             pcb[curProcessId].pid = pid;
             counter = 0;
         }
-    }    
-printf("black hole\n");
+    }
+    printf("black hole\n");
 }
 void contextSwitching_RR()
 {
     printf("Enter context switching\n");
     int curRemaining = *sched_shmaddr;
     printf("curRemaining %d\n", curRemaining);
-    struct Node* N = CircularQueueDeleteFirst(Q);
-    CircularQueueInsert(Q,N->process);
-    struct Process *process =&(Q->head->process);
+    struct Node *N = CircularQueueDeleteFirst(Q);
+    CircularQueueInsert(Q, N->process);
+    struct Process *process = &(Q->head->process);
     printf("Switch\n");
     kill(pcb[curProcessId].pid, SIGSTOP);
-    printf("processStpped\n");   
+    printf("processStpped\n");
     pcb[curProcessId].lastStopped = getClk();
-    pcb[curProcessId].process.runtime =curRemaining;
+    pcb[curProcessId].process.runtime = curRemaining;
     logProcess(curProcessId, "stopped", getClk());
     curProcessId = process->id;
     runProcess(process);
 }
-
 
 void handleGenFinish(int signum)
 {
@@ -516,4 +521,67 @@ void handleGenFinish(int signum)
     up(gen_sem_id);
     waitGen = false;
     printf("wait Gen = false.\n");
+}
+
+void schedulerPerformance()
+{
+
+    int totalSchedulerRunningTime = getClk();
+    double CPU_Utilization = (1.0 * totalTimeForProcessesRunning / totalSchedulerRunningTime) * 100.0;
+    double AvgWTA = TotalWTA / AllProcesses;
+    double AvgWaiting = totalWaiting / AllProcesses;
+
+    double variation = 0;
+    for (int i = 0; i < AllProcesses; i++)
+    {
+        variation += ((pcb[i].WTA - AvgWTA) * (pcb[i].WTA - AvgWTA));
+    }
+    double StdWTA = sqrt(variation);
+
+    CPU_Utilization = (int)(CPU_Utilization * 100 + .5);
+    CPU_Utilization = (float)CPU_Utilization / 100;
+    CPU_Utilization = floor(100 * CPU_Utilization) / 100;
+
+    AvgWTA = (int)(AvgWTA * 100 + .5);
+    AvgWTA = (float)AvgWTA / 100;
+    AvgWTA = floor(100 * AvgWTA) / 100;
+
+    AvgWaiting = (int)(AvgWaiting * 100 + .5);
+    AvgWaiting = (float)AvgWaiting / 100;
+    AvgWaiting = floor(100 * AvgWaiting) / 100;
+
+    StdWTA = (int)(StdWTA * 100 + .5);
+    StdWTA = (float)StdWTA / 100;
+    StdWTA = floor(100 * StdWTA) / 100;
+
+    char util[50];
+    char avgWTA[50];
+    char avgWaiting[50];
+    char std[50];
+    sprintf(util, "%g", CPU_Utilization);
+    sprintf(avgWTA, "%g", AvgWTA);
+    sprintf(avgWaiting, "%g", AvgWaiting);
+    sprintf(std, "%g", StdWTA);
+    char *conc = (char *)malloc(2);
+    conc = (char *)"%";
+    strcat(util, conc);
+
+    perfLog = fopen("performance.log", "w");
+    char *firstStrings[4] = {"CPU utilization = ", "Avg WTA = ", "Avg Waiting = ", "Std WTA = "};
+
+    for (int i = 0; i < 4; i++)
+    {
+        char *strOut = (char *)malloc(200 * sizeof(char));
+        strcat(strOut, firstStrings[i]);
+        if (i == 0)
+            strcat(strOut, util);
+        else if (i == 1)
+            strcat(strOut, avgWTA);
+        else if (i == 2)
+            strcat(strOut, avgWaiting);
+        else
+            strcat(strOut, std);
+        fprintf(perfLog, "%s \n", strOut);
+    }
+    fclose(perfLog);
 }

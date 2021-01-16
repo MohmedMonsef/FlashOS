@@ -118,7 +118,7 @@ int main(int argc, char *argv[])
 		printf("Enter time slot for each process: ");
 		scanf("%s", Parameter);
 		int quantum = atoi(Parameter);
-		while(quantum < 1)
+		while (quantum < 1)
 		{
 			printf("Please Enter a valid time slot for each process: ");
 			scanf("%s", Parameter);

@@ -15,7 +15,7 @@
 #include "./DataStructures/CircularQueue.h"
 #include <string.h>
 #include <errno.h>
-
+#include <math.h>
 typedef short BOOLEAN;
 #define true 1
 #define false 0

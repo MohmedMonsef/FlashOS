@@ -24,8 +24,8 @@ struct PriorityQueue
 };
 struct CircularQueue
 {
-	struct Node *head;
-	struct Node *last;
+    struct Node *head;
+    struct Node *last;
     struct Node *toInsert;
 };
 /*
@@ -50,4 +50,5 @@ struct PCB
     int totalRunTime;
     int wait;
     int lastStopped;
+    float WTA;
 };
