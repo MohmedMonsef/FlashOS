@@ -2,28 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
-// //Process
-/*struct Process
-{
-     int id;
-     int arrival;
-     int runtime;
-     int priority;
- };
-//Node in CircularQueue
- struct Node {
-    struct Process process;
-    struct Node *next;
- };
-//CircularQueue
-struct CircularQueue
-{
- 	struct Node *head;
- 	struct Node *last;
- };
- */
-//Q is the Circular Queue You are Working on
-//this is considered like a constructor in C++
+
 struct CircularQueue*initiate(struct CircularQueue*Q)
 {
 	Q = (struct CircularQueue*) malloc(sizeof(struct CircularQueue));
@@ -81,28 +60,4 @@ void PrintCircularQueue(struct CircularQueue*Q) {
 	
    printf(" ]");
 }
-//this is for testing only
-/*
-void main()
-{
-	struct CircularQueue*Q = initiate(Q);
-	struct Process P;
-	P.id = 1;
-	P.arrival = 1;
-	P.runtime = 4;
-	P.priority = 10;
-	CircularQueueInsert(Q,P);
-	PrintCircularQueue(Q);
-	struct Process P1;
-	P1.id = 2;
-	P1.arrival = 5;
-	P1.runtime = 2;
-	P1.priority = 8;
-	CircularQueueInsert(Q,P1);
-	PrintCircularQueue(Q);
-	struct Node *N = CircularQueueDeleteFirst(Q);
-	PrintCircularQueue(Q);
-	CircularQueueInsert(Q,N->process);
-	PrintCircularQueue(Q);
-}
-*/
+

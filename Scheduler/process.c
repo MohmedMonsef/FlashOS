@@ -13,26 +13,17 @@ union Semun
 int attachShm(int key);
 void createSem(int key, union Semun *sem);
 void up();
-void down(); //Not needed in the process
-void sendRemainingTime();
-
-void contHandler(int signum);
-void stopHandler(int signum);
+void down();
 void clearResources(int signum);
 
 int remaining_time, shm_id, sem_id;
 int *sched_shmaddr;
 union Semun semun;
 int prevClk, nxtClk;
-int globalRemaining;
 int main(int agrc, char *argv[])
 {
-    printf("New process forked\n");
-    // kill(getppid(), SIGCONT);
     initClk();
-     signal(SIGUSR1, stopHandler);
     signal(SIGINT, clearResources);
-     //signal(SIGCONT, contHandler);
     attachShm(SCHEDULER_SHM_KEY);
 
     createSem(SCHED_SEM_KEY, &semun);
@@ -50,11 +41,8 @@ int main(int agrc, char *argv[])
 
             if (remaining_time != 0)
             {
-                globalRemaining = remaining_time;
                 up();
             }
-
-            printf("___Remaining time = %i\n", remaining_time);
         }
         prevClk = nxtClk;  
     }
@@ -71,8 +59,6 @@ int attachShm(int key)
         perror("Error in creating the shared memory @ Process:(\n");
         exit(-1);
     }
-    // else
-    //     printf("\nShared memory ID = %d\n", shmid);
 
     sched_shmaddr = (int *)shmat(shmid, (void *)0, 0);
     if (*sched_shmaddr == -1)
@@ -80,8 +66,7 @@ int attachShm(int key)
         perror("Error in attach in Process:(\n");
         exit(-1);
     }
-    // else
-    //     printf("Process: Shared memory attached at address %ls\n", shmaddr);
+
     return shm_id;
 }
 
@@ -125,30 +110,6 @@ void up()
         perror("Error in up() at Process:(\n");
         exit(-1);
     }
-    printf("up process\n");
-}
-
-
-/*
- * Send the remaining time to the schedular.
- * Stop.
-*/
-void stopHandler(int signum)
-{
-    //sendRemainingTime();
-    //ToBeFixed : Remaining Time That The scheduler reads in real needs to be sent in SIGCONT
-    remaining_time = globalRemaining;
-    printf("Process go to sleep\n");
-    //kill(getpid(), SIGSTOP);
-    raise(SIGSTOP);
-}
-
-void contHandler(int signum)
-{
-    prevClk = getClk();
-    nxtClk = getClk();
-    signal(SIGCONT, SIG_DFL);
-    raise(SIGCONT);
 }
 
 /*
@@ -163,6 +124,5 @@ void clearResources(int signum)
     shmdt(sched_shmaddr);
     destroyClk(false);
     kill(getppid(), SIGUSR2);
-    printf("Notified Parent and exiting..\n");
     exit(0);
 }

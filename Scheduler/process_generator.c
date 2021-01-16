@@ -31,7 +31,6 @@ int main(int argc, char *argv[])
 	message.header = 1;
 	union Semun semun;
 	createSem(GEN_SEM_KEY, &semun);
-	// TODO Initialization
 	// 1. Read the input files.(done)
 	int n = 0;
 	FILE *fs = fopen(argv[1], "r");
@@ -52,7 +51,6 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
-				//sscanf(L,"%d",&Array[i]);
 				n++;
 			}
 		}
@@ -96,11 +94,6 @@ int main(int argc, char *argv[])
 		Processes[index] = P;
 		index++;
 	}
-	// for(int i = 0; i < n; i++)
-	// {
-	// 	printf("Process id = %i, arrival = %i, run_time = %i, priority = %i\n", Processes[i].id, Processes[i].arrival, Processes[i].runtime, Processes[i].priority);
-	// }
-	// clearResources(0);
 
 	// 2. Ask the user for the chosen scheduling algorithm and its parameters, if there are any.(done)
 	int pid1, pid2, algo = 0;
@@ -129,6 +122,7 @@ int main(int argc, char *argv[])
 		{
 			printf("Please Enter a valid time slot for each process: ");
 			scanf("%s", Parameter);
+			quantum = atoi(Parameter);
 		}
 	}
 	// 3. Initiate and create the scheduler and clock processes.
@@ -267,18 +261,6 @@ void down()
 
 void up()
 {
-	/*struct sembuf v_op;
-
-	v_op.sem_num = 0;
-	v_op.sem_op = 1;
-	v_op.sem_flg = !IPC_NOWAIT;
-
-	if (semop(gen_sem_id, &v_op, 1) == -1)
-	{
-		perror("Error in up() at Process:(\n");
-		exit(-1);
-	}
-	*/
 	union Semun sem;
 	sem.val = 1; /* initial value of the semaphore, Binary semaphore */
 	if (semctl(gen_sem_id, 0, SETVAL, sem) == -1)

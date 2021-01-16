@@ -15,7 +15,7 @@ int receiveProcess(struct ProcessBuff *message);
 
 int createShmem(int key);
 int createSem(int key, union Semun *sem);
-void up(int sem_id); //Not needed in the scheduler
+void up(int sem_id); 
 void down(int sem_id);
 int getRemainingTime();
 
@@ -119,7 +119,7 @@ int main(int argc, char *argv[])
 /*
  * IMPORTANT NOTES:
  * The schedular should send the run time to the process when forking.
- * When the schedular wants to stop a process, it send a SIGUSR1 signal to it.
+ * When the schedular wants to stop a process, it send a SIGSTOP signal to it.
 */
 
 /* 
@@ -144,7 +144,6 @@ int createQueue(int key)
 */
 int receiveProcess(struct ProcessBuff *message)
 {
-    //printf("Scheduler is Receiving a process\n");
     int x = msgrcv(gen_q_id, message, sizeof(message->content), ALL, IPC_NOWAIT);
     if (x != -1)
     {
@@ -168,7 +167,6 @@ void handleChildExit(int signum)
     pcb[curProcessId].process.runtime = 0;
     logProcess(curProcessId, "finished", getClk());
     processRunning = false;
-    //p_op.sem_flg = (IPC_NOWAIT);
     processCount--;
     interrupt_from_process = true;
     up(sched_sem_id);
@@ -276,7 +274,7 @@ void up(int sem_id)
 /*
  * Remove "Schedular Q"
  * Destroy clk
- * Terminate all ??
+ * Terminate all 
 */
 void clearResources(int signum)
 {
@@ -297,8 +295,6 @@ void insertPCB(struct Process newProccess, int pid)
     pcb[id].totalRunTime = newProccess.runtime;
     pcb[id].lastStopped = newProccess.arrival;
 }
-//TODO
-//delete - should free the created process memory
 
 //writing in files
 void writeInFile(char **params, int size)
@@ -317,7 +313,7 @@ void writeInFile(char **params, int size)
 
 void logProcess(int id, char *status, int clk)
 {
-    //id += 1;
+    id += 1;
     bool finished = strcmp(status, "finished");
     int size = finished == 0 ? 9 : 7;
     char *params[9];
@@ -350,7 +346,6 @@ void HPF()
     while (rsv_value != -1)
     {
         printf("Received id = %i\n", receivedProcess->content.id + 1);
-        //logProcess(receivedProcess->content.id, "arrived", getClk());
         pushProcess(receivedProcess->content);
         rsv_value = receiveProcess(receivedProcess);
     }
@@ -371,21 +366,16 @@ void HPF()
 void STN()
 {
     printf("Enter STN\n");
-
-    // if(processRunning)
-    //     kill(pcb[curProcessId].pid, SIGUSR1);
-
     int rsv_value = receiveProcess(receivedProcess);
     bool received = false;
     while (rsv_value != -1)
     {
         received = true;
         printf("############Received id = %i\n", receivedProcess->content.id + 1);
-        //logProcess(receivedProcess->content.id, "arrived", getClk());
         pushProcess(receivedProcess->content);
         rsv_value = receiveProcess(receivedProcess);
     }
-    if (processRunning && received) //&& (*sched_shmaddr > 1))
+    if (processRunning && received) 
     {
         contextSwitching_STN();
     }
@@ -407,22 +397,15 @@ void STN()
 void contextSwitching_STN()
 {
     printf("Enter context switching\n");
-    /*
-    printf("Stop the current process to compare.\n");
-    int what = kill(pcb[curProcessId].pid, SIGUSR1);
-    printf("the sent kill = %i\n", what);
-    int curRemaining = getRemainingTime();
-    */
     int curRemaining = *sched_shmaddr;
     printf("curRemaining %d\n", curRemaining);
     struct Process *process = getFrontProcess();
 
     if (curRemaining > process->runtime)
     {
-        //switch
         printf("Switch\n");
 
-        kill(pcb[curProcessId].pid, SIGUSR1);
+        kill(pcb[curProcessId].pid, SIGSTOP);
         
         process = popProcess();
         pcb[curProcessId].lastStopped = getClk();
@@ -432,8 +415,6 @@ void contextSwitching_STN()
         curProcessId = process->id;
         runProcess(process);
     }
-    // else
-    //     kill(pcb[curProcessId].pid, SIGCONT);
     
 }
 int runProcess(struct Process *curProccess)
@@ -500,7 +481,6 @@ void RR()
         struct Process *curProccess = &(Q->head->process);
         if (curProccess)
         {
-            //Q->head = Q->head->next;
             printf("Run new processs\n");
             int pid = runProcess(curProccess);
             processRunning = true;
@@ -516,12 +496,9 @@ void contextSwitching_RR()
     printf("Enter context switching\n");
     int curRemaining = *sched_shmaddr;
     printf("curRemaining %d\n", curRemaining);
-    //Q->head = Q->head->next;
-    //Q->last = Q->last->next;
     struct Node* N = CircularQueueDeleteFirst(Q);
     CircularQueueInsert(Q,N->process);
     struct Process *process =&(Q->head->process);
-    //switch
     printf("Switch\n");
     kill(pcb[curProcessId].pid, SIGSTOP);
     printf("processStpped\n");   
