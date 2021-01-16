@@ -150,7 +150,7 @@ void handleChildExit(int signum)
     processCount--;
     interrupt_from_process = true;
     up(sched_sem_id);
-    if(processCount < 1)
+    if (processCount < 1)
         clearResources(0);
 }
 
@@ -188,7 +188,7 @@ int createSem(int key, union Semun *sem)
         exit(-1);
     }
 
-    if(key != GEN_SEM_KEY)
+    if (key != GEN_SEM_KEY)
     {
         sem->val = 0; /* initial value of the semaphore, Binary semaphore */
         if (semctl(sem_id, 0, SETVAL, *sem) == -1)
@@ -224,13 +224,11 @@ void down(int sem_id)
             printf("Interrupted in down\n");
             down(sem_id);
         }
-            
     }
     if (sem_id == gen_sem_id)
         printf("down generator\n");
     else
         printf("Down process\n");
-    
 }
 
 void up(int sem_id)
@@ -314,6 +312,7 @@ void writeInFile(char **params, int size)
 
 void logProcess(int id, char *status, int clk)
 {
+    id += 1;
     bool finished = strcmp(status, "finished");
     int size = finished == 0 ? 9 : 7;
     char *params[9];
@@ -332,7 +331,7 @@ void logProcess(int id, char *status, int clk)
     if (finished == 0)
     {
         int TA = clk - pcb[id].process.arrival;
-        float WTA = (float)TA / pcb[id].totalRunTime;
+        float WTA = (pcb[id].totalRunTime != 0) ? (float)TA / pcb[id].totalRunTime : 0;
         WTA = (int)(WTA * 100 + .5);
         WTA = (float)WTA / 100;
         sprintf(params[7], "%d", TA);

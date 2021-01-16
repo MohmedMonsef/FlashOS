@@ -9,6 +9,10 @@ int ceil_int(double x)
 }
 int log2_int(int x)
 {
+    if (x == 0 || x == 1)
+    {
+        return 1;
+    }
     int power = 0;
     int res = 1;
     while (res < x)
@@ -38,7 +42,7 @@ void closeMemoryLogFile()
 }
 void writeInMemoryFile(char **params, int size)
 {
-    char *firstStrings[6] = {"At time  ", "   ", " ", " Bytes For Process ", " from ", "  to  "};
+    char *firstStrings[6] = {"At time ", " ", " ", " bytes for process ", " from ", " to "};
     char *strOut = (char *)malloc(500);
     for (int i = 0; i < size; i++)
     {

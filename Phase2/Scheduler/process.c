@@ -27,10 +27,11 @@ int prevClk, nxtClk;
 int globalRemaining;
 int main(int agrc, char *argv[])
 {
+    printf("New process forked\n");
+    //kill(getppid(), SIGCONT);
     initClk();
-    signal(SIGUSR1, stopHandler);
     signal(SIGINT, clearResources);
-    signal(SIGCONT, contHandler);
+
     attachShm(SCHEDULER_SHM_KEY);
 
     createSem(SCHED_SEM_KEY, &semun);
@@ -41,6 +42,7 @@ int main(int agrc, char *argv[])
     {
 
         nxtClk = getClk();
+        down();
         if (nxtClk == prevClk + 1)
         {
             remaining_time--;
@@ -51,11 +53,9 @@ int main(int agrc, char *argv[])
                 globalRemaining = remaining_time;
                 up();
             }
-
-            prevClk = nxtClk;
         }
-        else if (nxtClk > prevClk)
-            prevClk = nxtClk;
+        prevClk = nxtClk;
+        up();
     }
 
     clearResources(0);
@@ -70,6 +70,8 @@ int attachShm(int key)
         perror("Error in creating the shared memory @ Process:(\n");
         exit(-1);
     }
+    // else
+    //     printf("\nShared memory ID = %d\n", shmid);
 
     sched_shmaddr = (int *)shmat(shmid, (void *)0, 0);
     if (*sched_shmaddr == -1)
@@ -77,6 +79,8 @@ int attachShm(int key)
         perror("Error in attach in Process:(\n");
         exit(-1);
     }
+    // else
+    //     printf("Process: Shared memory attached at address %ls\n", shmaddr);
     return shm_id;
 }
 
@@ -124,6 +128,7 @@ void up()
 
 void sendRemainingTime()
 {
+    printf("Sending remaining time to Schedular\n");
     *sched_shmaddr = remaining_time;
     up();
 }
@@ -132,20 +137,6 @@ void sendRemainingTime()
  * Send the remaining time to the schedular.
  * Stop.
 */
-void stopHandler(int signum)
-{
-    remaining_time = globalRemaining;
-    printf("Process go to sleep\n");
-    raise(SIGSTOP);
-}
-
-void contHandler(int signum)
-{
-    prevClk = getClk();
-    nxtClk = getClk();
-    signal(SIGCONT, SIG_DFL);
-    raise(SIGCONT);
-}
 
 /*
  * Detach the shared memory.
@@ -155,8 +146,10 @@ void contHandler(int signum)
 */
 void clearResources(int signum)
 {
+    printf("Current process is exiting\n");
     shmdt(sched_shmaddr);
     destroyClk(false);
     kill(getppid(), SIGUSR2);
+    printf("Notified Parent and exiting..\n");
     exit(0);
 }

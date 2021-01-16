@@ -172,7 +172,7 @@ bool insertInMemory(struct Process process, int clk)
         int updateOffset = updateList(tmpIndex, process.id);
         memory.memory[tmpIndex].freeCount -= 1;
         int listSize = pow2(tmpIndex + 1);
-        logProcessMemory(process.id, process.memSize, updateOffset * listSize, updateOffset * listSize + listSize - 1, "Allocated", clk);
+        logProcessMemory(process.id, process.memSize, updateOffset * listSize, updateOffset * listSize + listSize - 1, "allocated", clk);
         return true;
     }
     int insetOffset = SearchAndDeleteListById(tmpIndex, -1);
@@ -186,7 +186,7 @@ bool insertInMemory(struct Process process, int clk)
     }
     InsertList(tmpIndex, insetOffset, process.id, affectedLists);
     int listSize = pow2(tmpIndex + 1);
-    logProcessMemory(process.id, process.memSize, insetOffset * listSize, insetOffset * listSize + listSize - 1, "Allocated", clk);
+    logProcessMemory(process.id, process.memSize, insetOffset * listSize, insetOffset * listSize + listSize - 1, "allocated", clk);
 }
 
 void SearchAndDeleteListByOffset(int listIndex, int offset)
@@ -233,7 +233,7 @@ struct Block **freeSpaceMemory(int listIndex, int processId, struct Block **merg
     memory.memory[listIndex].freeCount += 1;
 
     tmp->processId = -1;
-    logProcessMemory(processId, processSize, tmp->startOffset * listSize, tmp->startOffset * listSize + listSize - 1, "Deallocated", clk);
+    logProcessMemory(processId, processSize, tmp->startOffset * listSize, tmp->startOffset * listSize + listSize - 1, "freed", clk);
     if (tmp->startOffset % 2 == 0)
     {
         mergedCells[0] = tmp;

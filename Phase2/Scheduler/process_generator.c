@@ -15,11 +15,7 @@ void handleSchedulerWake(int signum);
 int createQueue(int key);
 int sendProcess(struct ProcessBuff *message, int q_id);
 
-void createSem(int key, union Semun *sem);
-void up();
-void down();
-
-int gen_q_id, gen_sem_id;
+int gen_q_id;
 bool go = false;
 
 int main(int argc, char *argv[])
@@ -30,7 +26,6 @@ int main(int argc, char *argv[])
 	struct ProcessBuff message;
 	message.header = 1;
 	union Semun semun;
-	createSem(GEN_SEM_KEY, &semun);
 	// TODO Initialization
 	// 1. Read the input files.(done)
 	int n = 0;
@@ -161,24 +156,25 @@ int main(int argc, char *argv[])
 				while (current_time >= Processes[index].arrival && index < n)
 				{
 					// 6. Send the information to the scheduler at the appropriate time.
-					printf("%d : %d\n", current_time, Processes[index].id); //instead send
 					struct ProcessBuff *newProcess = (struct ProcessBuff *)malloc(sizeof(struct ProcessBuff));
 					struct Process p = {Processes[index].id - 1, Processes[index].arrival, Processes[index].runtime, Processes[index].priority, Processes[index].memSize};
 					newProcess->header = 1;
 					newProcess->content = p;
 					if (sendProcess(newProcess, gen_q_id) != -1)
 						index++;
-					allowed_up = true;
-				}
-				if ((allowed_up || current_time > prev_time) && (current_time < last_time))
-				{
-					up();
-					allowed_up = false;
-					prev_time = current_time;
 				}
 			}
+			struct ProcessBuff *newProcess = (struct ProcessBuff *)malloc(sizeof(struct ProcessBuff));
+			struct Process p = {-1, -1, -1, -1};
+			newProcess->header = 1;
+			newProcess->content = p;
+			int x = sendProcess(newProcess, gen_q_id);
+			while (x == -1)
+			{
+				x = sendProcess(newProcess, gen_q_id);
+			}
 			//When all proceeses are sent, don't make the scheduler wait for you:
-			kill(pid1, SIGUSR1);
+			//kill(pid1, SIGUSR1);
 		}
 	}
 
@@ -217,56 +213,6 @@ int sendProcess(struct ProcessBuff *message, int q_id)
 		printf("Failed to send the process @ Generator:(\n");
 
 	return status;
-}
-
-void createSem(int key, union Semun *sem)
-{
-	//1. Create Sems:
-	gen_sem_id = semget(key, 1, 0666 | IPC_CREAT);
-
-	if (gen_sem_id == -1)
-	{
-		perror("Error in create the semaphor at scheduler:(\n");
-		exit(-1);
-	}
-
-	sem->val = 0; /* initial value of the semaphore, Binary semaphore */
-	if (semctl(gen_sem_id, 0, SETVAL, *sem) == -1)
-	{
-		perror("Error in semctl: set value\n");
-		exit(-1);
-	}
-}
-
-void down()
-{
-	struct sembuf p_op;
-
-	p_op.sem_num = 0;
-	p_op.sem_op = -1;
-	p_op.sem_flg = !IPC_NOWAIT;
-
-	if (semop(gen_sem_id, &p_op, 1) == -1)
-	{
-		perror("Error in down() at Process:(\n");
-		exit(-1);
-	}
-	printf("Wait Scheduler to wake\n");
-}
-
-void up()
-{
-	struct sembuf v_op;
-
-	v_op.sem_num = 0;
-	v_op.sem_op = 1;
-	v_op.sem_flg = !IPC_NOWAIT;
-
-	if (semop(gen_sem_id, &v_op, 1) == -1)
-	{
-		perror("Error in up() at Process:(\n");
-		exit(-1);
-	}
 }
 
 void handleSchedulerWake(int signum)
