@@ -21,10 +21,19 @@ At time  9  process  3 stopped  arr  3  total  4  remain  2  wait  4
 At time  9  process  0 resumed  arr  1  total  7  remain  4  wait  7
 At time  10  process  0 stopped  arr  1  total  7  remain  2  wait  7
 At time  10  process  3 resumed  arr  3  total  4  remain  2  wait  5
-At time  11  process  3 stopped  arr  3  total  4  remain  0  wait  5
-At time  11  process  0 resumed  arr  1  total  7  remain  2  wait  8
-At time  12  process  0 stopped  arr  1  total  7  remain  0  wait  8
-At time  12  process  3 resumed  arr  3  total  4  remain  0  wait  6
-At time  12  process  3 finished  arr  3  total  4  remain  0  wait  6 ta 9  wta  2.250000
-At time  13  process  0 resumed  arr  1  total  7  remain  0  wait  10
-At time  13  process  0 finished  arr  1  total  7  remain  0  wait  10 ta 12  wta  1.710000
+At time  11  process  3 finished  arr  3  total  4  remain  0  wait  5 ta 8  wta  2.000000
+At time  11  process  0 resumed  arr  1  total  7  remain  2  wait  9
+At time  12  process  0 finished  arr  1  total  7  remain  0  wait  9 ta 11  wta  1.570000
+At time  13  process  4 arrived  arr  13  total  5  remain  5  wait  0
+At time  13  process  4 started  arr  13  total  5  remain  5  wait  0
+At time  14  process  4 stopped  arr  13  total  5  remain  4  wait  0
+At time  14  process  4 resumed  arr  13  total  5  remain  4  wait  0
+At time  15  process  4 stopped  arr  13  total  5  remain  3  wait  0
+At time  15  process  4 resumed  arr  13  total  5  remain  3  wait  0
+At time  16  process  4 stopped  arr  13  total  5  remain  2  wait  0
+At time  16  process  4 resumed  arr  13  total  5  remain  2  wait  0
+At time  17  process  4 stopped  arr  13  total  5  remain  1  wait  0
+At time  17  process  4 resumed  arr  13  total  5  remain  1  wait  0
+At time  18  process  4 stopped  arr  13  total  5  remain  0  wait  0
+At time  18  process  4 resumed  arr  13  total  5  remain  0  wait  0
+At time  18  process  4 finished  arr  13  total  5  remain  0  wait  0 ta 5  wta  1.000000

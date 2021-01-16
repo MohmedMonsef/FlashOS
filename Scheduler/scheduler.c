@@ -317,7 +317,7 @@ void writeInFile(char **params, int size)
 
 void logProcess(int id, char *status, int clk)
 {
-    id += 1;
+    //id += 1;
     bool finished = strcmp(status, "finished");
     int size = finished == 0 ? 9 : 7;
     char *params[9];
@@ -350,7 +350,7 @@ void HPF()
     while (rsv_value != -1)
     {
         printf("Received id = %i\n", receivedProcess->content.id + 1);
-        logProcess(receivedProcess->content.id, "arrived", getClk());
+        //logProcess(receivedProcess->content.id, "arrived", getClk());
         pushProcess(receivedProcess->content);
         rsv_value = receiveProcess(receivedProcess);
     }
@@ -381,7 +381,7 @@ void STN()
     {
         received = true;
         printf("############Received id = %i\n", receivedProcess->content.id + 1);
-        logProcess(receivedProcess->content.id, "arrived", getClk());
+        //logProcess(receivedProcess->content.id, "arrived", getClk());
         pushProcess(receivedProcess->content);
         rsv_value = receiveProcess(receivedProcess);
     }
@@ -478,7 +478,6 @@ int runProcess(struct Process *curProccess)
 void RR()
 {
     printf("Enter RR\n");
-    printf("Q = %i\n", quantum);
     counter++;
     int rsv_value = receiveProcess(receivedProcess);
     bool received = false;
@@ -490,7 +489,7 @@ void RR()
         CircularQueueInsert(Q,receivedProcess->content);
         rsv_value = receiveProcess(receivedProcess);
     }
-    if (counter % quantum == 0&&processRunning)
+    if (counter % quantum == 0 && processRunning && *shmaddr != 0)
     {
         contextSwitching_RR();
         counter = 0;
