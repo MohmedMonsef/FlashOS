@@ -138,7 +138,7 @@ int main(int argc, char *argv[])
 	else if (pid1 == 0)
 	{
 		// schedular
-		char *pcbSize;
+		char *pcbSize = (char *)malloc(100 * sizeof(char *));
 		sprintf(pcbSize, "%d", n);
 		char *a[] = {Algo, pcbSize, Parameter, NULL};
 		execv("./scheduler.out", a);
@@ -161,9 +161,10 @@ int main(int argc, char *argv[])
 			// 4. Use this function after creating the clock process to initialize clock
 			initClk();
 			// TODO Generation Main Loop
-			int current_time, prev_time = -1, last_time = Processes[n-1].arrival;
+			int current_time, prev_time = -1, last_time = Processes[n - 1].arrival;
 			bool allowed_up = false;
-			while(!go);// Wait the scheduler
+			while (!go)
+				; // Wait the scheduler
 			while (index < n)
 			{
 				// To get time use this

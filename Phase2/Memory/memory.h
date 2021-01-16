@@ -155,7 +155,7 @@ bool updateList(int listIndex, int processId)
     return tmp->startOffset;
 }
 
-bool insertInMemory(struct Process process)
+bool insertInMemory(struct Process process, int clk)
 {
     int indexInMem = log2_int(process.memSize) - 1;
     int tmpIndex = indexInMem;
@@ -169,8 +169,10 @@ bool insertInMemory(struct Process process)
     }
     if (tmpIndex == indexInMem)
     {
-        updateList(tmpIndex, process.id);
+        int updateOffset = updateList(tmpIndex, process.id);
         memory.memory[tmpIndex].freeCount -= 1;
+        int listSize = pow2(tmpIndex + 1);
+        logProcessMemory(process.id, process.memSize, updateOffset * listSize, updateOffset * listSize + listSize - 1, "allocated", clk);
         return true;
     }
     int insetOffset = SearchAndDeleteListById(tmpIndex, -1);
@@ -183,6 +185,8 @@ bool insertInMemory(struct Process process)
         insetOffset = insetOffset * 2;
     }
     InsertList(tmpIndex, insetOffset, process.id, affectedLists);
+    int listSize = pow2(tmpIndex + 1);
+    logProcessMemory(process.id, process.memSize, insetOffset * listSize, insetOffset * listSize + listSize - 1, "allocated", clk);
 }
 
 void SearchAndDeleteListByOffset(int listIndex, int offset)
@@ -212,8 +216,9 @@ void SearchAndDeleteListByOffset(int listIndex, int offset)
     memory.memory[listIndex].freeCount -= 1;
 }
 
-struct Block **freeSpaceMemory(int listIndex, int processId, struct Block **mergedCells)
+struct Block **freeSpaceMemory(int listIndex, int processId, struct Block **mergedCells, int processSize, int clk)
 {
+    int listSize = pow2(listIndex + 1);
     struct Block *tmp = memory.memory[listIndex].head;
     struct Block *prev = NULL;
     while (tmp && tmp->processId != processId)
@@ -228,6 +233,7 @@ struct Block **freeSpaceMemory(int listIndex, int processId, struct Block **merg
     memory.memory[listIndex].freeCount += 1;
 
     tmp->processId = -1;
+    logProcessMemory(processId, processSize, tmp->startOffset * listSize, tmp->startOffset * listSize + listSize - 1, "freed", clk);
     if (tmp->startOffset % 2 == 0)
     {
         mergedCells[0] = tmp;
@@ -270,12 +276,12 @@ bool mergeCells(int listIndex, struct Block **mergedCells)
     return true;
 }
 
-void deleteFromMemory(struct Process process)
+void deleteFromMemory(struct Process process, int clk)
 {
 
     int indexInMem = log2_int(process.memSize) - 1;
     struct Block *mergedCells[2] = {NULL, NULL};
-    struct Block **mergedCellsAddress = freeSpaceMemory(indexInMem, process.id, mergedCells);
+    struct Block **mergedCellsAddress = freeSpaceMemory(indexInMem, process.id, mergedCells, process.memSize, clk);
     mergeCells(indexInMem, mergedCellsAddress);
 }
 

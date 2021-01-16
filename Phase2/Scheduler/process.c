@@ -30,9 +30,8 @@ int main(int agrc, char *argv[])
     printf("New process forked\n");
     //kill(getppid(), SIGCONT);
     initClk();
-    signal(SIGUSR1, stopHandler);
     signal(SIGINT, clearResources);
-    signal(SIGCONT, contHandler);
+
     attachShm(SCHEDULER_SHM_KEY);
 
     createSem(SCHED_SEM_KEY, &semun);
@@ -41,8 +40,10 @@ int main(int agrc, char *argv[])
     prevClk = getClk();
     while (remaining_time > 0)
     {
+
         nxtClk = getClk();
-        if (nxtClk != prevClk)
+        down();
+        if (nxtClk == prevClk + 1)
         {
             remaining_time--;
             *sched_shmaddr = remaining_time;
@@ -52,10 +53,9 @@ int main(int agrc, char *argv[])
                 globalRemaining = remaining_time;
                 up();
             }
-
-            printf("___Remaining time = %i\n", remaining_time);
-            prevClk = nxtClk;
         }
+        prevClk = nxtClk;
+        up();
     }
 
     clearResources(0);
@@ -94,13 +94,6 @@ void createSem(int key, union Semun *sem)
         perror("Error in create the semaphor at scheduler:(\n");
         exit(-1);
     }
-
-    sem->val = 0; /* initial value of the semaphore, Binary semaphore */
-    if (semctl(sem_id, 0, SETVAL, *sem) == -1)
-    {
-        perror("Error in semctl: set value\n");
-        exit(-1);
-    }
 }
 
 void down()
@@ -131,7 +124,6 @@ void up()
         perror("Error in up() at Process:(\n");
         exit(-1);
     }
-    printf("up process\n");
 }
 
 void sendRemainingTime()
@@ -145,22 +137,6 @@ void sendRemainingTime()
  * Send the remaining time to the schedular.
  * Stop.
 */
-void stopHandler(int signum)
-{
-    //sendRemainingTime();
-    //ToBeFixed : Remaining Time That The scheduler reads in real needs to be sent in SIGCONT
-    remaining_time = globalRemaining;
-    printf("Process go to sleep\n");
-    raise(SIGSTOP);
-}
-
-void contHandler(int signum)
-{
-    prevClk = getClk();
-    nxtClk = getClk();
-    signal(SIGCONT, SIG_DFL);
-    raise(SIGCONT);
-}
 
 /*
  * Detach the shared memory.
