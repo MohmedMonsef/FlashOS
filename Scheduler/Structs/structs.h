@@ -22,6 +22,12 @@ struct PriorityQueue
     struct LinkedList *tail;
     int type;
 };
+struct CircularQueue
+{
+	struct Node *head;
+	struct Node *last;
+    struct Node *toInsert;
+};
 /*
 *Messages structs:
 *Note: A message should not contain pointers as it will cause segmentaiton fault. 

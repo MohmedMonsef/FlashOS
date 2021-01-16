@@ -12,7 +12,9 @@
 #include <signal.h>
 #include "./Structs/structs.h"
 #include "./DataStructures/PriorityQueue.h"
+#include "./DataStructures/CircularQueue.h"
 #include <string.h>
+#include <errno.h>
 
 typedef short BOOLEAN;
 #define true 1

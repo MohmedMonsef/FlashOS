@@ -1,5 +1,4 @@
 #include "headers.h"
-#include <errno.h>
 
 /* arg for semctl system calls. */
 union Semun
@@ -26,14 +25,16 @@ void handleGenFinish(int signum);
 
 void HPF();
 void STN();
+void RR();
 
 void logProcess(int id, char *status, int clk);
 void writeInFile(char **params, int size);
 void insertPCB(struct Process newProccess, int pid);
 int runProcess(struct Process *curProccess);
 void contextSwitching_STN();
+void contextSwitching_RR();
 
-int gen_q_id, shm_id, sched_sem_id, curProcessId, gen_sem_id;
+int gen_q_id, shm_id, sched_sem_id, curProcessId, gen_sem_id, quantum, counter = 0, prev_time=-1;
 int *sched_shmaddr;
 int schedulerType, processCount;
 bool processRunning = false, waitGen = true;
@@ -43,6 +44,7 @@ FILE *fLog;
 struct ProcessBuff *receivedProcess;
 union Semun semun;
 bool interrupt_from_generator = false, interrupt_from_process = false;
+struct CircularQueue*Q;
 
 int main(int argc, char *argv[])
 {
@@ -61,19 +63,35 @@ int main(int argc, char *argv[])
     gen_sem_id = createSem(GEN_SEM_KEY, &gen_semun);
 
     schedulerType = atoi(argv[0]);
-    processCount = atoi(argv[1]);
-    pcb = (struct PCB *)malloc(processCount * sizeof(struct PCB));
-
-    if (schedulerType != 3)
+    if(schedulerType == 3)
+    {
+        quantum = atoi(argv[2]);
+        Q = initiate(Q);
+    }
+    else
     {
         createPriorityQueue(2 - schedulerType);
     }
+        
+    processCount = atoi(argv[1]);
+    pcb = (struct PCB *)malloc(processCount * sizeof(struct PCB));
+
     receivedProcess = (struct ProcessBuff *)malloc(sizeof(struct ProcessBuff));
     receivedProcess->header = 1;
     fLog = fopen("scheduler.log", "w");
     kill(getppid(), SIGUSR1);
     while (processCount)
     {
+        if (waitGen)
+        {
+            printf("Try down gen\n");
+            down(gen_sem_id);
+        }
+        if (processRunning)
+        {
+            printf("Try down process\n");
+            down(sched_sem_id);
+        }
 
         if (schedulerType == 1)
         {
@@ -81,18 +99,17 @@ int main(int argc, char *argv[])
         }
         else if (schedulerType == 2)
         {
-            if (waitGen)
-            {
-                printf("Try down gen\n");
-                down(gen_sem_id);
-            }
-            if (processRunning)
-            {
-                printf("Try down process\n");
-                down(sched_sem_id);
-            }
             STN();
         }
+        else if (schedulerType == 3)
+        {
+            while(getClk() - prev_time < 1)
+                ;
+            printf("processes: %d\n",processCount);
+            RR();
+            prev_time = getClk();
+        }
+        printf("processes: %d\n",processCount);
     }
     fclose(fLog);
     //upon termination release the clock resources.
@@ -143,6 +160,11 @@ int receiveProcess(struct ProcessBuff *message)
 void handleChildExit(int signum)
 {
     printf("Parent is notified of child exit.\n");
+    if(schedulerType == 3)
+    {
+        CircularQueueDeleteFirst(Q);
+        PrintCircularQueue(Q);
+    }
     pcb[curProcessId].process.runtime = 0;
     logProcess(curProcessId, "finished", getClk());
     processRunning = false;
@@ -202,7 +224,7 @@ int createSem(int key, union Semun *sem)
 
 void down(int sem_id)
 {
-
+    printf("inside the down\n");
     p_op.sem_num = 0;
     p_op.sem_op = -1;
     p_op.sem_flg = (!IPC_NOWAIT);
@@ -222,6 +244,9 @@ void down(int sem_id)
         else
         {
             printf("Interrupted in down\n");
+            if(sem_id == gen_sem_id && interrupt_from_process)
+                down(sched_sem_id);
+            interrupt_from_process = false;
             down(sem_id);
         }
             
@@ -249,26 +274,6 @@ void up(int sem_id)
     printf("Up scheduler\n");
 }
 
-int getRemainingTime()
-{ /*
-    printf("B READ\n");
-    if (processRunning)
-    {
-        down();
-        int rem = *sched_shmaddr;
-        //up();
-        printf("Getting rem time at Scheduler\n");
-        return rem;
-    }
-    return -1;
-*/
-    printf("B READ\n");
-    down(sched_sem_id);
-    int rem = *sched_shmaddr;
-    //up();
-    printf("Getting rem time at Scheduler\n");
-    return rem;
-}
 
 /*
  * Remove "Schedular Q"
@@ -367,12 +372,16 @@ void HPF()
 void STN()
 {
     printf("Enter STN\n");
+
+    // if(processRunning)
+    //     kill(pcb[curProcessId].pid, SIGUSR1);
+
     int rsv_value = receiveProcess(receivedProcess);
     bool received = false;
     while (rsv_value != -1)
     {
         received = true;
-        printf("Received id = %i\n", receivedProcess->content.id + 1);
+        printf("############Received id = %i\n", receivedProcess->content.id + 1);
         logProcess(receivedProcess->content.id, "arrived", getClk());
         pushProcess(receivedProcess->content);
         rsv_value = receiveProcess(receivedProcess);
@@ -413,7 +422,9 @@ void contextSwitching_STN()
     {
         //switch
         printf("Switch\n");
+
         kill(pcb[curProcessId].pid, SIGUSR1);
+        
         process = popProcess();
         pcb[curProcessId].lastStopped = getClk();
         pcb[curProcessId].process.runtime = curRemaining;
@@ -422,6 +433,9 @@ void contextSwitching_STN()
         curProcessId = process->id;
         runProcess(process);
     }
+    // else
+    //     kill(pcb[curProcessId].pid, SIGCONT);
+    
 }
 int runProcess(struct Process *curProccess)
 {
@@ -433,6 +447,7 @@ int runProcess(struct Process *curProccess)
         pcb[curProccess->id].wait += (getClk() - pcb[curProcessId].lastStopped);
         printf("resumed time %d\n", pcb[curProccess->id].process.runtime);
         logProcess(curProccess->id, "resumed", getClk());
+        *sched_shmaddr = pcb[curProccess->id].process.runtime;
         kill(pid, SIGCONT);
     }
     else
@@ -445,10 +460,12 @@ int runProcess(struct Process *curProccess)
             char runtime[50];
             sprintf(runtime, "%d", curProccess->runtime);
             char *arg[] = {runtime, NULL};
+            *sched_shmaddr = curProccess->runtime;
             execv("./process.out", arg);
         }
         else
         {
+            pcb[curProccess->id].pid = pid;
             printf("cur wait id = %d  w= %d ls = %d\n", curProccess->id, pcb[curProccess->id].wait, pcb[curProccess->id].lastStopped);
             pcb[curProccess->id].wait = (getClk() - pcb[curProccess->id].lastStopped);
             logProcess(curProccess->id, "started", getClk());
@@ -457,6 +474,66 @@ int runProcess(struct Process *curProccess)
     printf("New Process entered, id = %i\n", curProccess->id + 1);
     return pid;
 }
+
+
+void RR()
+{
+    printf("Enter RR\n");
+    printf("Q = %i\n", quantum);
+    counter++;
+    int rsv_value = receiveProcess(receivedProcess);
+    bool received = false;
+    while (rsv_value != -1)
+    {
+        received = true;
+        printf("############Received id = %i\n", receivedProcess->content.id + 1);
+        logProcess(receivedProcess->content.id, "arrived", getClk());
+        CircularQueueInsert(Q,receivedProcess->content);
+        rsv_value = receiveProcess(receivedProcess);
+    }
+    if (counter % quantum == 0&&processRunning)
+    {
+        contextSwitching_RR();
+        counter = 0;
+    }   
+    if (!processRunning)
+    {
+        printf("Enter Process not running so add new one.\n");
+        struct Process *curProccess = &(Q->head->process);
+        if (curProccess)
+        {
+            //Q->head = Q->head->next;
+            printf("Run new processs\n");
+            int pid = runProcess(curProccess);
+            processRunning = true;
+            curProcessId = curProccess->id;
+            pcb[curProcessId].pid = pid;
+            counter = 0;
+        }
+    }    
+printf("black hole\n");
+}
+void contextSwitching_RR()
+{
+    printf("Enter context switching\n");
+    int curRemaining = *sched_shmaddr;
+    printf("curRemaining %d\n", curRemaining);
+    //Q->head = Q->head->next;
+    //Q->last = Q->last->next;
+    struct Node* N = CircularQueueDeleteFirst(Q);
+    CircularQueueInsert(Q,N->process);
+    struct Process *process =&(Q->head->process);
+    //switch
+    printf("Switch\n");
+    kill(pcb[curProcessId].pid, SIGSTOP);
+    printf("processStpped\n");   
+    pcb[curProcessId].lastStopped = getClk();
+    pcb[curProcessId].process.runtime =curRemaining;
+    logProcess(curProcessId, "stopped", getClk());
+    curProcessId = process->id;
+    runProcess(process);
+}
+
 
 void handleGenFinish(int signum)
 {

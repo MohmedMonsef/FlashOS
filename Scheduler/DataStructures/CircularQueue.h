@@ -2,25 +2,26 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
-//Process
-struct Process
+// //Process
+/*struct Process
 {
-    int id;
-    int arrival;
-    int runtime;
-    int priority;
-};
+     int id;
+     int arrival;
+     int runtime;
+     int priority;
+ };
 //Node in CircularQueue
-struct CircularQueueNode {
-   struct Process Ps;
-   struct CircularQueueNode *next;
-};
+ struct Node {
+    struct Process process;
+    struct Node *next;
+ };
 //CircularQueue
 struct CircularQueue
 {
-	struct CircularQueueNode *head;
-	struct CircularQueueNode *last;
-};
+ 	struct Node *head;
+ 	struct Node *last;
+ };
+ */
 //Q is the Circular Queue You are Working on
 //this is considered like a constructor in C++
 struct CircularQueue*initiate(struct CircularQueue*Q)
@@ -31,72 +32,57 @@ struct CircularQueue*initiate(struct CircularQueue*Q)
 	return Q;
 }
 //check if queue is empty or not
-bool isEmpty(struct CircularQueue*Q) {
+bool Empty(struct CircularQueue*Q) {
    return Q->head == NULL;
-}
-//Get number of processes in Queue
-int CircularQueueLength(struct CircularQueue*Q) {
-   int length = 0;
-   if(Q->head == NULL) {
-      return 0;
-   }
-   length++;
-   struct CircularQueueNode *current = Q->head->next;
-   while(current != Q->head) {
-      length++;
-      current = current->next;   
-   }
-	
-   return length;
 }
 //insert new process in Circular Queue
 void CircularQueueInsert(struct CircularQueue*Q,struct Process P) {
 
-   struct CircularQueueNode *New = (struct CircularQueueNode*) malloc(sizeof(struct CircularQueueNode));
-   New->Ps = P;
-   if (isEmpty(Q)) {
+   struct Node *New = (struct Node*) malloc(sizeof(struct Node));
+   New->process = P;
+   if (Empty(Q)) {
       Q->head = New;
       Q->last = Q->head;
    } else {
       Q->last->next = New;
       Q->last = New;
    }    
-   New->next = Q->head;
+   New->next = NULL;
 }
 
 //delete first item
-struct CircularQueueNode * CircularQueueDeleteFirst(struct CircularQueue*Q) {
+struct Node * CircularQueueDeleteFirst(struct CircularQueue*Q) {
 
-   struct CircularQueueNode *temp = Q->head;
-	
+   struct Node *temp = Q->head;
+	if(!temp) return NULL;
    if(Q->head->next == Q->head) {  
       Q->head = NULL;
       return temp;
    }     
 
    Q->head = Q->head->next;
-   Q->last->next = Q->head;
    return temp;
 }
 
 //display the list
 void PrintCircularQueue(struct CircularQueue*Q) {
 
-   struct CircularQueueNode *ptr = Q->head;
+   struct Node *ptr = Q->head;
    printf("\n[ ");
 	
    //start from the beginning
    if(Q->head != NULL) {	
-      while(ptr->next != Q->head) {     
-         printf("(%d,%d,%d,%d) ",ptr->Ps.id,ptr->Ps.arrival,ptr->Ps.runtime,ptr->Ps.priority);
+      while(ptr->next != NULL) {     
+         printf("(%d,%d,%d,%d) ",ptr->process.id,ptr->process.arrival,ptr->process.runtime,ptr->process.priority);
          ptr = ptr->next;
       }
-      printf("(%d,%d,%d,%d) ",ptr->Ps.id,ptr->Ps.arrival,ptr->Ps.runtime,ptr->Ps.priority);
+      printf("(%d,%d,%d,%d) ",ptr->process.id,ptr->process.arrival,ptr->process.runtime,ptr->process.priority);
    }
 	
    printf(" ]");
 }
 //this is for testing only
+/*
 void main()
 {
 	struct CircularQueue*Q = initiate(Q);
@@ -114,7 +100,9 @@ void main()
 	P1.priority = 8;
 	CircularQueueInsert(Q,P1);
 	PrintCircularQueue(Q);
-	CircularQueueDeleteFirst(Q);
+	struct Node *N = CircularQueueDeleteFirst(Q);
+	PrintCircularQueue(Q);
+	CircularQueueInsert(Q,N->process);
 	PrintCircularQueue(Q);
 }
-
+*/

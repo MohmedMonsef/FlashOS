@@ -28,11 +28,11 @@ int globalRemaining;
 int main(int agrc, char *argv[])
 {
     printf("New process forked\n");
-    //kill(getppid(), SIGCONT);
+    // kill(getppid(), SIGCONT);
     initClk();
-    signal(SIGUSR1, stopHandler);
+     signal(SIGUSR1, stopHandler);
     signal(SIGINT, clearResources);
-    signal(SIGCONT, contHandler);
+     //signal(SIGCONT, contHandler);
     attachShm(SCHEDULER_SHM_KEY);
 
     createSem(SCHED_SEM_KEY, &semun);
@@ -41,7 +41,7 @@ int main(int agrc, char *argv[])
     prevClk = getClk();
     while (remaining_time > 0)
     {
-
+        
         nxtClk = getClk();
         if (nxtClk == prevClk + 1)
         {
@@ -55,11 +55,8 @@ int main(int agrc, char *argv[])
             }
 
             printf("___Remaining time = %i\n", remaining_time);
-            prevClk = nxtClk;
         }
-        else if(nxtClk > prevClk)
-            prevClk = nxtClk;
-            
+        prevClk = nxtClk;  
     }
 
     clearResources(0);
@@ -131,12 +128,6 @@ void up()
     printf("up process\n");
 }
 
-void sendRemainingTime()
-{
-    printf("Sending remaining time to Schedular\n");
-    *sched_shmaddr = remaining_time;
-    up();
-}
 
 /*
  * Send the remaining time to the schedular.
@@ -148,6 +139,7 @@ void stopHandler(int signum)
     //ToBeFixed : Remaining Time That The scheduler reads in real needs to be sent in SIGCONT
     remaining_time = globalRemaining;
     printf("Process go to sleep\n");
+    //kill(getpid(), SIGSTOP);
     raise(SIGSTOP);
 }
 
