@@ -10,7 +10,7 @@ union Semun
     struct seminfo *__buf; /* buffer for IPC_INFO */
     void *__pad;
 };
-
+void schedulerPerformance();
 int createQueue(int key);
 int receiveProcess(struct ProcessBuff *message);
 
@@ -40,10 +40,14 @@ bool processRunning = false, waitGen = true;
 struct sembuf p_op;
 struct PCB *pcb;
 FILE *fLog;
+FILE *perfLog;
 struct ProcessBuff *receivedProcess;
 union Semun semun;
 bool interrupt_from_generator = false, interrupt_from_process = false;
-
+int totalTimeForProcessesRunning = 0;
+double TotalWTA = 0;
+double totalWaiting = 0;
+int AllProcesses = 0;
 int main(int argc, char *argv[])
 {
     key_t key_id;
@@ -60,6 +64,7 @@ int main(int argc, char *argv[])
     union Semun gen_semun;
     schedulerType = atoi(argv[0]);
     processCount = atoi(argv[1]);
+    AllProcesses = processCount;
     pcb = (struct PCB *)malloc(processCount * sizeof(struct PCB));
 
     if (schedulerType != 3)
@@ -84,6 +89,7 @@ int main(int argc, char *argv[])
     }
     fclose(fLog);
     closeMemoryLogFile();
+    schedulerPerformance();
     clearResources(0);
 }
 
@@ -142,7 +148,10 @@ void handleChildExit(int signum)
     deleteFromMemory(pcb[curProcessId].process, getClk());
     interrupt_from_process = true;
     if (processCount < 1)
+    {
+        schedulerPerformance();
         clearResources(0);
+    }
 }
 
 int createShmem(int key)
@@ -261,6 +270,7 @@ void insertPCB(struct Process newProccess, int pid)
     pcb[id].pid = pid;
     pcb[id].totalRunTime = newProccess.runtime;
     pcb[id].lastStopped = newProccess.arrival;
+    totalTimeForProcessesRunning += pcb[id].totalRunTime;
 }
 //TODO
 //delete - should free the created process memory
@@ -303,6 +313,9 @@ void logProcess(int id, char *status, int clk)
         WTA = (int)(WTA * 100 + .5);
         WTA = (float)WTA / 100;
         WTA = floor(100 * WTA) / 100;
+        pcb[id].WTA = WTA;
+        TotalWTA += WTA;
+        totalWaiting += pcb[id].wait;
         sprintf(params[7], "%d", TA);
         sprintf(params[8], "%g", WTA);
     }
@@ -431,4 +444,67 @@ int runProcess(struct Process *curProccess)
         }
     }
     return pid;
+}
+
+void schedulerPerformance()
+{
+
+    int totalSchedulerRunningTime = getClk();
+    double CPU_Utilization = (1.0 * totalTimeForProcessesRunning / totalSchedulerRunningTime) * 100.0;
+    double AvgWTA = TotalWTA / AllProcesses;
+    double AvgWaiting = totalWaiting / AllProcesses;
+
+    double variation = 0;
+    for (int i = 0; i < AllProcesses; i++)
+    {
+        variation += ((pcb[i].WTA - AvgWTA) * (pcb[i].WTA - AvgWTA));
+    }
+    double StdWTA = sqrt(variation);
+
+    CPU_Utilization = (int)(CPU_Utilization * 100 + .5);
+    CPU_Utilization = (float)CPU_Utilization / 100;
+    CPU_Utilization = floor(100 * CPU_Utilization) / 100;
+
+    AvgWTA = (int)(AvgWTA * 100 + .5);
+    AvgWTA = (float)AvgWTA / 100;
+    AvgWTA = floor(100 * AvgWTA) / 100;
+
+    AvgWaiting = (int)(AvgWaiting * 100 + .5);
+    AvgWaiting = (float)AvgWaiting / 100;
+    AvgWaiting = floor(100 * AvgWaiting) / 100;
+
+    StdWTA = (int)(StdWTA * 100 + .5);
+    StdWTA = (float)StdWTA / 100;
+    StdWTA = floor(100 * StdWTA) / 100;
+
+    char util[50];
+    char avgWTA[50];
+    char avgWaiting[50];
+    char std[50];
+    sprintf(util, "%g", CPU_Utilization);
+    sprintf(avgWTA, "%g", AvgWTA);
+    sprintf(avgWaiting, "%g", AvgWaiting);
+    sprintf(std, "%g", StdWTA);
+    char *conc = (char *)malloc(2);
+    conc = (char *)"%";
+    strcat(util, conc);
+
+    perfLog = fopen("performance.log", "w");
+    char *firstStrings[4] = {"CPU utilization = ", "Avg WTA = ", "Avg Waiting = ", "Std WTA = "};
+
+    for (int i = 0; i < 4; i++)
+    {
+        char *strOut = (char *)malloc(200 * sizeof(char));
+        strcat(strOut, firstStrings[i]);
+        if (i == 0)
+            strcat(strOut, util);
+        else if (i == 1)
+            strcat(strOut, avgWTA);
+        else if (i == 2)
+            strcat(strOut, avgWaiting);
+        else
+            strcat(strOut, std);
+        fprintf(perfLog, "%s \n", strOut);
+    }
+    fclose(perfLog);
 }

@@ -45,4 +45,5 @@ struct PCB
     int totalRunTime;
     int wait;
     int lastStopped;
+    float WTA;
 };
