@@ -566,7 +566,7 @@ void schedulerPerformance()
     conc = (char *)"%";
     strcat(util, conc);
 
-    perfLog = fopen("performance.log", "w");
+    perfLog = fopen("scheduler.perf", "w");
     char *firstStrings[4] = {"CPU utilization = ", "Avg WTA = ", "Avg Waiting = ", "Std WTA = "};
 
     for (int i = 0; i < 4; i++)
