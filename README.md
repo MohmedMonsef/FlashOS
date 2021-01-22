@@ -23,7 +23,7 @@ This project consists of 3 phases :
 
 ## Data-structures
 1. 2-Level Priority Queue:
-	- First level: each node represents a linked list that’s is sorted with the priority.
+	- First level: each node represents a linked list that is sorted with the priority.
 	- Second level: each linked list in the first level is a list of all processes have the same priority sorted by the arrival time.
 2. Circular Queue:
 	*	The name “Circular” demonstrates the way we are dealing with it. We pop a process, then give it its quantum then push it at the end of the queue.
