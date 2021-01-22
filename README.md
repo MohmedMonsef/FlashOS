@@ -1,7 +1,9 @@
 
 
-<p>
-<a><img  src="https://i.ibb.co/zGfHG79/kisspng-flash-wally-west-logo-the-cw-television-network-su-5b39a5e2d06500-8939138315305046748536.png" align="center" alt="FlashOs Logo" Width="300px" height="300px" /></a>
+<p >
+<a><img  src="https://i.ibb.co/zGfHG79/kisspng-flash-wally-west-logo-the-cw-television-network-su-5b39a5e2d06500-8939138315305046748536.png" align="center" alt="FlashOs Logo" Width="300px" height="300px"/></a>
+
+[![GitHub stars](https://img.shields.io/github/stars/badges/shields.svg?style=social&label=Stars&style=plastic)](https://github.com/MohmedMonsef/FlashOS/stargazers) [![GitHub forks](https://img.shields.io/github/forks/badges/shields.svg?style=social&label=Fork&style=plastic)](https://github.com/MohmedMonsef/FlashOS/network) [![Issues](https://img.shields.io/github/issues-raw/tterb/PlayMusic.svg?maxAge=25000)](https://github.com/MohmedMonsef/FlashOS/issues) [![GitHub pull requests](https://img.shields.io/github/issues-pr/cdnjs/cdnjs.svg?style=flat)](https://github.com/MohmedMonsef/FlashOS/pulls) [![PR's Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)](http://makeapullrequest.com) [![GitHub contributors](https://img.shields.io/github/contributors/cdnjs/cdnjs.svg?style=flat)](https://github.com/MohmedMonsef/FlashOS/graphs/contributors)
 <h1 align="center">FlashOs</h1>
 </p>
 
@@ -29,11 +31,10 @@ This project consists of 3 phases :
 	*	each list represents the memory blocks with the size of this list - sizes of lists are multiples of 2 till 2 power 10 (1024 -memory size ).
 
 ## IPCS
-* ##### 	Semaphores
-* #####	Message Queues
-* #####	Shared Memory
-* #####	Signals
-
+1. Semaphores
+2. Message Queues
+3. Shared Memory
+4. Signals
 
 * #### Refer to [OS-Report](OS-Report.pdf) for more details about the used methodologies and input/output samples.
 - ## Scheduler
