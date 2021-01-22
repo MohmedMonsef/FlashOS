@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include "./utilities.h"
-
+void displayMemory();
 struct Memory memory;
 bool isMemoryCreated = false;
 struct Block
@@ -129,7 +129,7 @@ struct Block **InsertList(int listIndex, int offset, int processId, struct Block
     return affectedCells;
 }
 
-bool updateList(int listIndex, int processId)
+int updateList(int listIndex, int processId)
 {
 
     if (isMemoryCreated == false)
@@ -290,6 +290,7 @@ bool checkIfProcessFitInMemory(int processSize)
     int i = 9;
     while (i >= 0 && memory.memory[i].freeCount == 0)
     {
+
         i--;
     }
     if (i == -1)

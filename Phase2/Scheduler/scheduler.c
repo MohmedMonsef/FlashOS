@@ -12,7 +12,7 @@ union Semun
 void schedulerPerformance();
 int createQueue(int key);
 int receiveProcess(struct ProcessBuff *message);
-
+void checkMemoryWaitingList();
 int createShmem(int key);
 int createSem(int key, union Semun *sem);
 void up(int sem_id);
@@ -58,6 +58,7 @@ int main(int argc, char *argv[])
     signal(SIGUSR2, handleChildExit);
     signal(SIGUSR1, handleGenFinish);
     createMemory();
+    createMemoryQueue();
     struct ProcessBuff message;
     gen_q_id = createQueue(GENERATOR_Q_KEY);
 
@@ -174,12 +175,37 @@ void handleChildExit(int signum)
     processRunning = false;
     processCount--;
     deleteFromMemory(pcb[curProcessId].process, getClk());
+    checkMemoryWaitingList();
     interrupt_from_process = true;
     up(sched_sem_id);
     if (processCount < 1)
     {
         schedulerPerformance();
         clearResources(0);
+    }
+}
+
+void checkMemoryWaitingList()
+{
+    while (true)
+    {
+        struct Process *frontProcess = getMemoryFrontProcess();
+        if (frontProcess && checkIfProcessFitInMemory(frontProcess->memSize))
+        {
+            if (schedulerType != 3)
+            {
+                pushProcess(*frontProcess);
+            }
+            else
+            {
+                CircularQueueInsert(Q, *frontProcess);
+            }
+            popMemoryProcess();
+        }
+        else
+        {
+            return;
+        }
     }
 }
 
@@ -357,16 +383,12 @@ void HPF()
     while (rsv_value != -1)
     {
         printf("Received id = %i\n", receivedProcess->content.id + 1);
+
         pushProcess(receivedProcess->content);
+
         rsv_value = receiveProcess(receivedProcess);
     }
-    struct Process *receivedProcessSize = getFrontProcess();
-    bool isProcessFitInMemory = true;
-    if (receivedProcessSize)
-    {
-        isProcessFitInMemory = checkIfProcessFitInMemory(receivedProcessSize->memSize);
-    }
-    if (!processRunning && isProcessFitInMemory)
+    if (!processRunning)
     {
         struct Process *curProccess = popProcess();
         if (curProccess)
@@ -374,8 +396,6 @@ void HPF()
             int pid = runProcess(curProccess);
             processRunning = true;
             curProcessId = curProccess->id;
-            pcb[curProcessId].wait = getClk() - pcb[curProcessId].process.arrival;
-            pcb[curProcessId].pid = pid;
         }
     }
 }
@@ -388,21 +408,17 @@ void STN()
     while (rsv_value != -1)
     {
         received = true;
-        printf("############Received id = %i\n", receivedProcess->content.id + 1);
+
         pushProcess(receivedProcess->content);
+
         rsv_value = receiveProcess(receivedProcess);
     }
-    struct Process *receivedProcessSize = getFrontProcess();
-    bool isProcessFitInMemory = true;
-    if (receivedProcessSize)
-    {
-        isProcessFitInMemory = checkIfProcessFitInMemory(receivedProcessSize->memSize);
-    }
-    if (processRunning && received && isProcessFitInMemory)
+
+    if (processRunning && received)
     {
         contextSwitching_STN();
     }
-    if (!processRunning && isProcessFitInMemory)
+    if (!processRunning)
     {
         printf("Enter Process not running so add new one.\n");
         struct Process *curProccess = popProcess();
@@ -410,9 +426,6 @@ void STN()
         {
 
             int pid = runProcess(curProccess);
-            processRunning = true;
-            curProcessId = curProccess->id;
-            pcb[curProcessId].pid = pid;
         }
     }
 }
@@ -451,27 +464,45 @@ int runProcess(struct Process *curProccess)
         logProcess(curProccess->id, "resumed", getClk());
         *sched_shmaddr = pcb[curProccess->id].process.runtime;
         kill(pid, SIGCONT);
+        processRunning = true;
+        curProcessId = curProccess->id;
     }
     else
     {
-        pid = fork();
-        if (pid == -1)
-            perror("error in fork");
-        else if (pid == 0)
-        { //sleep(1);
-            char runtime[50];
-            sprintf(runtime, "%d", curProccess->runtime);
-            char *arg[] = {runtime, NULL};
-            *sched_shmaddr = curProccess->runtime;
-            execv("./process.out", arg);
+        bool isProcessFitInMemory = checkIfProcessFitInMemory(curProccess->memSize);
+        if (isProcessFitInMemory == true)
+        {
+            insertInMemory(*curProccess, getClk());
+
+            pid = fork();
+            if (pid == -1)
+                perror("error in fork");
+            else if (pid == 0)
+            { //sleep(1);
+                char runtime[50];
+                sprintf(runtime, "%d", curProccess->runtime);
+                char *arg[] = {runtime, NULL};
+                *sched_shmaddr = curProccess->runtime;
+                execv("./process.out", arg);
+            }
+            else
+            {
+                pcb[curProccess->id].pid = pid;
+                printf("cur wait id = %d  w= %d ls = %d\n", curProccess->id, pcb[curProccess->id].wait, pcb[curProccess->id].lastStopped);
+                pcb[curProccess->id].wait = (getClk() - pcb[curProccess->id].lastStopped);
+                logProcess(curProccess->id, "started", getClk());
+                processRunning = true;
+                curProcessId = curProccess->id;
+            }
         }
         else
         {
-            insertInMemory(pcb[curProccess->id].process, getClk());
-            pcb[curProccess->id].pid = pid;
-            printf("cur wait id = %d  w= %d ls = %d\n", curProccess->id, pcb[curProccess->id].wait, pcb[curProccess->id].lastStopped);
-            pcb[curProccess->id].wait = (getClk() - pcb[curProccess->id].lastStopped);
-            logProcess(curProccess->id, "started", getClk());
+            pushMemoryProcess(*curProccess);
+            if (schedulerType == 3)
+            {
+                CircularQueueDeleteFirst(Q);
+            }
+            processRunning = false;
         }
     }
     return pid;
@@ -486,23 +517,18 @@ void RR()
     while (rsv_value != -1)
     {
         received = true;
+
         CircularQueueInsert(Q, receivedProcess->content);
+
         rsv_value = receiveProcess(receivedProcess);
     }
 
-    struct Process *receivedProcessSize = &Q->head->process;
-    bool isProcessFitInMemory = true;
-    if (receivedProcessSize)
-    {
-        isProcessFitInMemory = checkIfProcessFitInMemory(receivedProcessSize->memSize);
-    }
-
-    if (counter % quantum == 0 && processRunning && *shmaddr != 0 && isProcessFitInMemory)
+    if (counter % quantum == 0 && processRunning && *shmaddr != 0)
     {
         contextSwitching_RR();
         counter = 0;
     }
-    if (!processRunning && isProcessFitInMemory)
+    if (!processRunning)
     {
         printf("Enter Process not running so add new one.\n");
         struct Process *curProccess = &(Q->head->process);
@@ -510,13 +536,9 @@ void RR()
         {
             printf("Run new processs\n");
             int pid = runProcess(curProccess);
-            processRunning = true;
-            curProcessId = curProccess->id;
-            pcb[curProcessId].pid = pid;
             counter = 0;
         }
     }
-    printf("black hole\n");
 }
 void contextSwitching_RR()
 {

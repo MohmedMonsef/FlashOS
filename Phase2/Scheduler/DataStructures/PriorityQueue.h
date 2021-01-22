@@ -4,7 +4,7 @@
 
 // The Main Priority Queue
 struct PriorityQueue *PriorityQueue = NULL;
-
+struct PriorityQueue *MemoryQueue = NULL;
 struct Node *createNewNode(struct Process process)
 {
     struct Node *newProcess = (struct Node *)malloc(sizeof(struct Node));
@@ -205,6 +205,149 @@ void displayQueue()
                 tmpNode = tmpNode->next;
             }
         }
+        tmp = tmp->nextList;
+    }
+
+    return;
+}
+
+bool createMemoryQueue()
+{
+    if (MemoryQueue != NULL)
+    {
+        return false;
+    }
+    MemoryQueue = (struct PriorityQueue *)malloc(sizeof(struct PriorityQueue));
+    MemoryQueue->front = NULL;
+    MemoryQueue->tail = NULL;
+    MemoryQueue->type = -1;
+    return true;
+}
+
+bool pushMemoryProcess(struct Process process)
+{
+    if (MemoryQueue == NULL)
+    {
+        return false;
+    }
+    struct LinkedList *ls = createNewLinkedList(process);
+
+    if (MemoryQueue->front == NULL)
+    {
+        MemoryQueue->front = ls;
+        MemoryQueue->tail = ls;
+        return true;
+    }
+    struct LinkedList *first = NULL;
+    struct LinkedList *second = MemoryQueue->front;
+    int processPriority = process.memSize;
+
+    int currentPriority = second->head->process.memSize;
+    while (second != NULL && currentPriority < processPriority)
+    {
+        first = second;
+        second = second->nextList;
+        currentPriority = (second == NULL) ? 0 : second->head->process.memSize;
+    }
+
+    if (second == NULL)
+    {
+        first->nextList = ls;
+        MemoryQueue->tail = ls;
+    }
+    else if (currentPriority == processPriority)
+    {
+        struct Node *nd = createNewNode(process);
+        second->tail->next = nd;
+        second->tail = nd;
+    }
+    else if (first == NULL)
+    {
+        ls->nextList = second;
+        MemoryQueue->front = ls;
+    }
+    else
+    {
+        ls->nextList = second;
+        first->nextList = ls;
+    }
+    return true;
+}
+
+/*
+@Description : Pop The Front Process In The Queue
+@Return : Pointer to Struct Process
+*/
+
+struct Process *popMemoryProcess()
+{
+    if (MemoryQueue == NULL || MemoryQueue->front == NULL)
+    {
+        return NULL;
+    }
+
+    struct Process *frontProcess = &MemoryQueue->front->head->process;
+
+    if (MemoryQueue->front->head == MemoryQueue->front->tail)
+    {
+        struct LinkedList *del = MemoryQueue->front;
+        MemoryQueue->front = MemoryQueue->front->nextList;
+        if (MemoryQueue->front == NULL)
+        {
+            MemoryQueue->tail = NULL;
+        }
+    }
+    else
+    {
+        struct Node *del = MemoryQueue->front->head;
+        MemoryQueue->front->head = MemoryQueue->front->head->next;
+    }
+    return frontProcess;
+}
+
+/*
+@Description : Get The Front Process In The Queue
+@Return : Pointer to Struct Process
+*/
+
+struct Process *getMemoryFrontProcess()
+{
+    if (MemoryQueue == NULL || MemoryQueue->front == NULL)
+    {
+        return NULL;
+    }
+
+    struct Process *frontProcess = &MemoryQueue->front->head->process;
+    return frontProcess;
+}
+
+/*
+@Description : Check If The Queue Is Empty
+@Return bool
+*/
+
+bool isMemoryEmpty()
+{
+    if (MemoryQueue == NULL || MemoryQueue->front == NULL)
+    {
+        return true;
+    }
+    return false;
+}
+
+void displayWaitingList()
+{
+    struct LinkedList *tmp = MemoryQueue->front;
+    while (tmp != NULL)
+    {
+
+        struct Node *tmpNode = tmp->head;
+        while (tmpNode != NULL)
+        {
+            printf("%d  id= %d  \n", tmpNode->process.memSize, tmpNode->process.id);
+            tmpNode = tmpNode->next;
+        }
+
         tmp = tmp->nextList;
     }
 
