@@ -1,7 +1,7 @@
 
 
 <p>
-<a><img  src="https://i.ibb.co/zGfHG79/kisspng-flash-wally-west-logo-the-cw-television-network-su-5b39a5e2d06500-8939138315305046748536.png" align="center" alt="FlashOs Logo"/></a>
+<a><img  src="https://i.ibb.co/zGfHG79/kisspng-flash-wally-west-logo-the-cw-television-network-su-5b39a5e2d06500-8939138315305046748536.png" align="center" alt="FlashOs Logo" Width="300px" height="300px" /></a>
 <h1 align="center">FlashOs</h1>
 </p>
 
