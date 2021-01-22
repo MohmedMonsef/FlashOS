@@ -3,7 +3,7 @@
 <p >
 <a><img  src="https://i.ibb.co/zGfHG79/kisspng-flash-wally-west-logo-the-cw-television-network-su-5b39a5e2d06500-8939138315305046748536.png" align="center" alt="FlashOs Logo" Width="300px" height="300px"/></a>
 
-[![GitHub forks](https://img.shields.io/github/forks/MohmedMonsef/FlashOS?label=Fork&style=plastic)](https://github.com/MohmedMonsef/FlashOS/network) [![GitHub Repo stars](https://img.shields.io/github/stars/MohmedMonsef/FlashOS?style=plastic)](https://github.com/MohmedMonsef/FlashOS/stargazers) [![GitHub contributors](https://img.shields.io/github/contributors/MohmedMonsef/FlashOS?style=plastic)](https://github.com/MohmedMonsef/FlashOS/graphs/contributors) [
+[![GitHub forks](https://img.shields.io/github/forks/MohmedMonsef/FlashOS?label=fork&style=plastic)](https://github.com/MohmedMonsef/FlashOS/network) [![GitHub Repo stars](https://img.shields.io/github/stars/MohmedMonsef/FlashOS?style=plastic)](https://github.com/MohmedMonsef/FlashOS/stargazers) [![GitHub contributors](https://img.shields.io/github/contributors/MohmedMonsef/FlashOS?style=plastic)](https://github.com/MohmedMonsef/FlashOS/graphs/contributors) [
 ![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/MohmedMonsef/FlashOS?style=plastic)]()
 <h1 align="center">FlashOs</h1>
 </p>
