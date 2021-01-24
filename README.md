@@ -38,7 +38,7 @@ This project consists of 3 phases :
 4. Signals
 
 * #### Refer to [OS-Report](OS-Report.pdf) for more details about the used methodologies and input/output samples.
-## Scheduler
+- ## Scheduler
 
      * ####  Run
      
